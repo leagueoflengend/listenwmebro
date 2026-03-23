@@ -6,9 +6,9 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// ĐÃ SỬA Ở ĐÂY: Dùng __dirname để đọc file ngay tại thư mục gốc
 app.use(express.static(__dirname));
 
+// Danh sách giờ sẽ chứa cả Tên bài và ID
 let playlist = [];
 
 io.on('connection', (socket) => {
@@ -16,15 +16,38 @@ io.on('connection', (socket) => {
 
     socket.emit('updatePlaylist', playlist);
 
-    socket.on('addToList', (videoId) => {
-        playlist.push(videoId);
+    socket.on('chatMessage', (data) => {
+        io.emit('chatMessage', data);
+    });
+
+    // ==========================================
+    // TỰ ĐỘNG LẤY TÊN BÀI HÁT TỪ YOUTUBE
+    // ==========================================
+    socket.on('addToList', async (videoId) => {
+        let videoTitle = `Đang tải tên bài hát... (ID: ${videoId})`; 
+        
+        try {
+            // Dùng API miễn phí của YouTube để lấy tên video
+            const response = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+            if (response.ok) {
+                const data = await response.json();
+                videoTitle = data.title; // Lấy được tên bài rồi!
+            }
+        } catch (error) {
+            console.log("Lỗi mạng, không lấy được tên.");
+            videoTitle = `Video ID: ${videoId}`; // Nếu lỗi thì hiện ID chữa cháy
+        }
+        
+        // Thêm vào danh sách cả ID lẫn Tên
+        playlist.push({ id: videoId, title: videoTitle });
         io.emit('updatePlaylist', playlist); 
     });
 
     socket.on('skipVideo', () => {
         if (playlist.length > 0) {
             const nextVideo = playlist.shift(); 
-            io.emit('changeVideo', nextVideo);  
+            // Phát bài tiếp theo (chỉ cần gửi ID cho trình duyệt)
+            io.emit('changeVideo', nextVideo.id);  
             io.emit('updatePlaylist', playlist);
         }
     });
@@ -41,7 +64,6 @@ io.on('connection', (socket) => {
     });
 });
 
-// ĐÃ SỬA Ở ĐÂY: Tự động nhận Port của Render cấp, nếu test ở máy thì dùng 3000
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server đang chạy tại port ${PORT}`);
