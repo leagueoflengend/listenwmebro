@@ -14,20 +14,19 @@ let playlist = [];
 io.on('connection', (socket) => {
     console.log('Một người dùng đã kết nối:', socket.id);
 
+    // Gửi danh sách phát khi mới vào phòng
     socket.emit('updatePlaylist', playlist);
 
+    // Xử lý Khung Chat
     socket.on('chatMessage', (data) => {
         io.emit('chatMessage', data);
     });
 
-    // ==========================================
-    // TỰ ĐỘNG LẤY TÊN BÀI HÁT TỪ YOUTUBE
-    // ==========================================
+    // Tự động lấy tên bài hát từ YouTube
     socket.on('addToList', async (videoId) => {
         let videoTitle = `Đang tải tên bài hát... (ID: ${videoId})`; 
         
         try {
-            // Dùng API miễn phí của YouTube để lấy tên video
             const response = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
             if (response.ok) {
                 const data = await response.json();
@@ -46,7 +45,6 @@ io.on('connection', (socket) => {
     socket.on('skipVideo', () => {
         if (playlist.length > 0) {
             const nextVideo = playlist.shift(); 
-            // Phát bài tiếp theo (chỉ cần gửi ID cho trình duyệt)
             io.emit('changeVideo', nextVideo.id);  
             io.emit('updatePlaylist', playlist);
         }
