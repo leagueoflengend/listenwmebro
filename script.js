@@ -79,7 +79,6 @@ socket.on('changeVideo', (videoId) => {
     setTimeout(() => isSyncing = false, 1000); 
 });
 
-// ĐÃ SỬA Ở ĐÂY: Hiện Tên thay vì ID
 socket.on('updatePlaylist', (playlist) => {
     playlistUI.innerHTML = ''; 
     if (playlist.length === 0) {
@@ -87,7 +86,6 @@ socket.on('updatePlaylist', (playlist) => {
     }
     playlist.forEach((item, index) => {
         const li = document.createElement('li');
-        // In ra tên bài hát (item.title)
         li.innerText = `${index + 1}. 🎵 ${item.title}`;
         playlistUI.appendChild(li);
     });
