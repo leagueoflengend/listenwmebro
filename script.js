@@ -4,7 +4,7 @@ const playlistUI = document.getElementById('playlistUI');
 let player; 
 let isSyncing = false; 
 
-// 1. TẢI YOUTUBE API
+// TẢI YOUTUBE API
 var tag = document.createElement('script');
 tag.src = "https://www.youtube.com/iframe_api";
 var firstScriptTag = document.getElementsByTagName('script')[0];
@@ -14,7 +14,7 @@ function onYouTubeIframeAPIReady() {
     player = new YT.Player('player', {
         height: '360',
         width: '640',
-        videoId: 'bwB9EMpW8eY', 
+        videoId: 'bwB9EMpW8eY', // Stand By You
         playerVars: { 'playsinline': 1, 'autoplay': 0, 'controls': 1 },
         events: {
             'onReady': () => { statusText.innerText = "Trạng thái: Sẵn sàng."; },
@@ -22,8 +22,6 @@ function onYouTubeIframeAPIReady() {
         }
     });
 }
-
-// 2. CÁC HÀM XỬ LÝ NÚT BẤM
 
 function getValidId() {
     const linkInput = document.getElementById('youtubeLink').value;
@@ -34,32 +32,27 @@ function getValidId() {
 
 function playNow() {
     const videoId = getValidId();
-    if (videoId) {
-        socket.emit('changeVideo', videoId);
-        document.getElementById('youtubeLink').value = ''; 
-    } else alert("Link không hợp lệ!");
+    if (videoId) { socket.emit('changeVideo', videoId); document.getElementById('youtubeLink').value = ''; } 
+    else alert("Link không hợp lệ!");
 }
 
 function addToList() {
     const videoId = getValidId();
-    if (videoId) {
-        socket.emit('addToList', videoId);
+    if (videoId) { 
+        socket.emit('addToList', videoId); 
         document.getElementById('youtubeLink').value = ''; 
-        statusText.innerText = "Trạng thái: Đã thêm vào hàng đợi.";
-    } else alert("Link không hợp lệ!");
+        statusText.innerText = "Trạng thái: Đang tải bài hát vào hàng đợi..."; 
+    } 
+    else alert("Link không hợp lệ!");
 }
 
-function skipVideo() {
-    socket.emit('skipVideo');
-}
+function skipVideo() { socket.emit('skipVideo'); }
 
-// Hàm tắt/bật hình ảnh (Chỉ nghe nhạc)
 let isAudioOnly = false;
 function toggleVideoMode() {
     const container = document.getElementById('youtubePlayerContainer');
     const btn = document.getElementById('toggleBtn');
     isAudioOnly = !isAudioOnly;
-    
     if (isAudioOnly) {
         container.classList.add('audio-only-mode');
         btn.innerText = "📺 Chế độ: Chỉ nghe Nhạc";
@@ -71,22 +64,14 @@ function toggleVideoMode() {
     }
 }
 
-// 3. XỬ LÝ SỰ KIỆN TRÌNH PHÁT YOUTUBE
 function onPlayerStateChange(event) {
     if (isSyncing) return; 
-
-    if (event.data == YT.PlayerState.PLAYING) {
-        socket.emit('play', player.getCurrentTime());
-    } else if (event.data == YT.PlayerState.PAUSED) {
-        socket.emit('pause');
-    } else if (event.data == YT.PlayerState.ENDED) {
-        // Tự động nhảy bài khi video kết thúc (người đầu tiên gửi lệnh)
-        socket.emit('skipVideo');
-    }
+    if (event.data == YT.PlayerState.PLAYING) socket.emit('play', player.getCurrentTime());
+    else if (event.data == YT.PlayerState.PAUSED) socket.emit('pause');
+    else if (event.data == YT.PlayerState.ENDED) socket.emit('skipVideo');
 }
 
-// 4. NHẬN LỆNH TỪ SERVER
-
+// Lắng nghe sự kiện từ Server
 socket.on('changeVideo', (videoId) => {
     isSyncing = true;
     player.loadVideoById(videoId);
@@ -94,16 +79,16 @@ socket.on('changeVideo', (videoId) => {
     setTimeout(() => isSyncing = false, 1000); 
 });
 
+// ĐÃ SỬA Ở ĐÂY: Hiện Tên thay vì ID
 socket.on('updatePlaylist', (playlist) => {
-    playlistUI.innerHTML = ''; // Xóa danh sách cũ
+    playlistUI.innerHTML = ''; 
     if (playlist.length === 0) {
-        playlistUI.innerHTML = '<li>Danh sách đang trống...</li>';
-        return;
+        playlistUI.innerHTML = '<li>Danh sách đang trống...</li>'; return;
     }
-    // In danh sách mới (Vì không có API key nên mình in tạm ID video ra nhé)
-    playlist.forEach((id, index) => {
+    playlist.forEach((item, index) => {
         const li = document.createElement('li');
-        li.innerText = `${index + 1}. Video ID: ${id}`;
+        // In ra tên bài hát (item.title)
+        li.innerText = `${index + 1}. 🎵 ${item.title}`;
         playlistUI.appendChild(li);
     });
 });
@@ -119,4 +104,30 @@ socket.on('pause', () => {
     isSyncing = true;
     player.pauseVideo();
     setTimeout(() => isSyncing = false, 500);
+});
+
+// LOGIC KHUNG CHAT
+function sendMessage() {
+    const nicknameInput = document.getElementById('nickname').value.trim();
+    const chatInput = document.getElementById('chatInput');
+    const message = chatInput.value.trim();
+    const finalName = nicknameInput === "" ? "Khách Ẩn Danh" : nicknameInput;
+
+    if (message !== "") {
+        socket.emit('chatMessage', { name: finalName, message: message });
+        chatInput.value = ''; 
+    }
+}
+
+function handleKeyPress(event) {
+    if (event.key === 'Enter') sendMessage();
+}
+
+socket.on('chatMessage', (data) => {
+    const chatMessages = document.getElementById('chatMessages');
+    const msgElement = document.createElement('div');
+    msgElement.classList.add('chat-msg');
+    msgElement.innerHTML = `<strong>${data.name}:</strong> ${data.message}`;
+    chatMessages.appendChild(msgElement);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 });
