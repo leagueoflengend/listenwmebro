@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Listen With Me 🎵 Pro</title>
+    <title>Listen With Me 🎵</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background-color: #1a1b26; color: #a9b1d6; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box;}
         .container { background-color: #24283b; padding: 25px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.4); text-align: center; width: 100%; max-width: 650px; }
@@ -17,8 +17,6 @@
         
         #youtubePlayerContainer { margin-top: 20px; aspect-ratio: 16 / 9; width: 100%; transition: 0.3s; }
         iframe { width: 100%; height: 100%; border: none; border-radius: 8px; }
-        
-        /* Ẩn video đi để tạo chế độ "Chỉ nghe nhạc" */
         .audio-only-mode { display: none !important; }
 
         .playlist-box { margin-top: 20px; text-align: left; background: #1f2335; padding: 15px; border-radius: 8px;}
@@ -26,12 +24,20 @@
         ul { list-style: none; padding: 0; margin: 0; }
         li { padding: 8px; border-bottom: 1px solid #292e42; font-size: 0.9em;}
         li:last-child { border-bottom: none; }
-
         #statusText { margin-top: 15px; font-size: 0.9em; color: #565f89; }
+
+        /* Khung Chat */
+        .chat-container { margin-top: 20px; background: #1f2335; padding: 15px; border-radius: 8px; text-align: left;}
+        .chat-container h3 { margin: 0 0 10px 0; color: #ff9e64; font-size: 1.1em;}
+        .name-input { margin-bottom: 10px; display: flex; gap: 10px; align-items: center; }
+        .name-input label { color: #a9b1d6; font-weight: bold; white-space: nowrap; }
+        .name-input input { padding: 8px; width: 150px;}
+        .chat-messages { height: 150px; overflow-y: auto; background: #16161e; padding: 10px; border-radius: 6px; margin-bottom: 10px; font-size: 0.95em; display: flex; flex-direction: column; gap: 8px;}
+        .chat-input-box { display: flex; gap: 8px; }
+        .chat-msg strong { color: #7dcfff; } 
     </style>
 </head>
 <body>
-
     <div class="container">
         <h1>🎵 Listen With Me</h1>
         
@@ -49,8 +55,20 @@
         <div id="youtubePlayerContainer">
             <div id="player"></div>
         </div>
-
         <div id="statusText">Trạng thái: Đang kết nối...</div>
+
+        <div class="chat-container">
+            <h3>💬 Trò chuyện</h3>
+            <div class="name-input">
+                <label for="nickname">Biệt danh:</label>
+                <input type="text" id="nickname" placeholder="Nhập tên..." value="Khách Ẩn Danh">
+            </div>
+            <div id="chatMessages" class="chat-messages"></div>
+            <div class="chat-input-box">
+                <input type="text" id="chatInput" placeholder="Nhập tin nhắn..." onkeypress="handleKeyPress(event)">
+                <button onclick="sendMessage()">Gửi</button>
+            </div>
+        </div>
 
         <div class="playlist-box">
             <h3>Danh sách chờ:</h3>
