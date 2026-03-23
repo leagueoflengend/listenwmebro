@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Listen With Me 🎵 Pro</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #1a1b26; color: #a9b1d6; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box;}
+        .container { background-color: #24283b; padding: 25px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.4); text-align: center; width: 100%; max-width: 650px; }
+        h1 { color: #7aa2f7; margin-bottom: 10px; margin-top: 0;}
+        .controls { margin: 15px 0; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;}
+        input[type="text"] { flex-grow: 1; padding: 10px; border-radius: 6px; border: 1px solid #414868; background-color: #1a1b26; color: #a9b1d6; outline: none; min-width: 200px;}
+        button { padding: 10px 15px; border: none; border-radius: 6px; background-color: #7aa2f7; color: #1a1b26; font-weight: bold; cursor: pointer; transition: 0.2s;}
+        button:hover { background-color: #89b4fa; }
+        .btn-secondary { background-color: #bb9af7; }
+        .btn-danger { background-color: #f7768e; }
+        
+        #youtubePlayerContainer { margin-top: 20px; aspect-ratio: 16 / 9; width: 100%; transition: 0.3s; }
+        iframe { width: 100%; height: 100%; border: none; border-radius: 8px; }
+        
+        /* Ẩn video đi để tạo chế độ "Chỉ nghe nhạc" */
+        .audio-only-mode { display: none !important; }
+
+        .playlist-box { margin-top: 20px; text-align: left; background: #1f2335; padding: 15px; border-radius: 8px;}
+        .playlist-box h3 { margin: 0 0 10px 0; color: #9ece6a; font-size: 1.1em;}
+        ul { list-style: none; padding: 0; margin: 0; }
+        li { padding: 8px; border-bottom: 1px solid #292e42; font-size: 0.9em;}
+        li:last-child { border-bottom: none; }
+
+        #statusText { margin-top: 15px; font-size: 0.9em; color: #565f89; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🎵 Listen With Me</h1>
+        
+        <div class="controls">
+            <input type="text" id="youtubeLink" placeholder="Dán link YouTube vào đây...">
+            <button onclick="playNow()">Phát Ngay</button>
+            <button onclick="addToList()" class="btn-secondary">+ Hàng Đợi</button>
+        </div>
+
+        <div class="controls">
+            <button onclick="skipVideo()" class="btn-danger">⏭️ Chuyển bài (Skip)</button>
+            <button onclick="toggleVideoMode()" id="toggleBtn">🎧 Chế độ: Đang xem Video</button>
+        </div>
+
+        <div id="youtubePlayerContainer">
+            <div id="player"></div>
+        </div>
+
+        <div id="statusText">Trạng thái: Đang kết nối...</div>
+
+        <div class="playlist-box">
+            <h3>Danh sách chờ:</h3>
+            <ul id="playlistUI">
+                <li>Danh sách đang trống...</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
