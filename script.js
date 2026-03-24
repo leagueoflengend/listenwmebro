@@ -3,6 +3,8 @@ const statusText = document.getElementById('statusText');
 const playlistUI = document.getElementById('playlistUI');
 let player; 
 let isSyncing = false; 
+let syncTimeout; // Quản lý độ trễ chống loạn nhịp
+let currentVideoId = ''; // Nhớ bài đang phát để chống load đúp
 
 // TẢI YOUTUBE API
 var tag = document.createElement('script');
@@ -14,7 +16,7 @@ function onYouTubeIframeAPIReady() {
     player = new YT.Player('player', {
         height: '360',
         width: '640',
-        videoId: 'bwB9EMpW8eY', // Stand By You
+        videoId: 'bwB9EMpW8eY', 
         playerVars: { 'playsinline': 1, 'autoplay': 0, 'controls': 1 },
         events: {
             'onReady': () => { statusText.innerText = "Trạng thái: Sẵn sàng."; },
@@ -46,7 +48,15 @@ function addToList() {
     else alert("Link không hợp lệ!");
 }
 
-function skipVideo() { socket.emit('skipVideo'); }
+// Tuyệt chiêu 1: Khóa nút Skip chống spam click
+let isSkipping = false;
+function skipVideo() { 
+    if (isSkipping) return; 
+    isSkipping = true;
+    socket.emit('skipVideo'); 
+    statusText.innerText = "Trạng thái: Đang chuyển bài...";
+    setTimeout(() => isSkipping = false, 2000); // Khóa 2 giây
+}
 
 let isAudioOnly = false;
 function toggleVideoMode() {
@@ -66,17 +76,37 @@ function toggleVideoMode() {
 
 function onPlayerStateChange(event) {
     if (isSyncing) return; 
-    if (event.data == YT.PlayerState.PLAYING) socket.emit('play', player.getCurrentTime());
-    else if (event.data == YT.PlayerState.PAUSED) socket.emit('pause');
-    else if (event.data == YT.PlayerState.ENDED) socket.emit('skipVideo');
+    
+    // Chỉ bắt sự kiện khi thực sự Phát/Dừng, bỏ qua lúc đang xoay vòng tròn (Buffering)
+    if (event.data == YT.PlayerState.PLAYING) {
+        socket.emit('play', player.getCurrentTime());
+    } else if (event.data == YT.PlayerState.PAUSED) {
+        socket.emit('pause');
+    } else if (event.data == YT.PlayerState.ENDED) {
+        skipVideo(); // Dùng hàm skip có chống spam
+    }
 }
 
-// Lắng nghe sự kiện từ Server
+// ==========================================
+// ĐỒNG BỘ MƯỢT MÀ TỪ SERVER
+// ==========================================
+
 socket.on('changeVideo', (videoId) => {
+    // Tuyệt chiêu 2: Bỏ qua nếu trùng bài hiện tại
+    if (currentVideoId === videoId) return; 
+    currentVideoId = videoId;
+
     isSyncing = true;
+    clearTimeout(syncTimeout);
+    
     player.loadVideoById(videoId);
-    statusText.innerText = `Trạng thái: Đang phát bài mới.`;
-    setTimeout(() => isSyncing = false, 1000); 
+    statusText.innerText = `Trạng thái: Đang tải bài mới...`;
+    
+    // Tuyệt chiêu 3: Cho 2.5s để mạng ổn định tải video
+    syncTimeout = setTimeout(() => {
+        isSyncing = false;
+        statusText.innerText = `Trạng thái: Đang phát.`;
+    }, 2500); 
 });
 
 socket.on('updatePlaylist', (playlist) => {
@@ -93,15 +123,18 @@ socket.on('updatePlaylist', (playlist) => {
 
 socket.on('play', (time) => {
     isSyncing = true;
-    if (Math.abs(player.getCurrentTime() - time) > 0.5) player.seekTo(time, true);
+    clearTimeout(syncTimeout);
+    // Độ dung sai 1 giây: Lệch ít thì kệ cho mượt, lệch nhiều mới tua
+    if (Math.abs(player.getCurrentTime() - time) > 1.0) player.seekTo(time, true);
     player.playVideo();
-    setTimeout(() => isSyncing = false, 500);
+    syncTimeout = setTimeout(() => isSyncing = false, 1500);
 });
 
 socket.on('pause', () => {
     isSyncing = true;
+    clearTimeout(syncTimeout);
     player.pauseVideo();
-    setTimeout(() => isSyncing = false, 500);
+    syncTimeout = setTimeout(() => isSyncing = false, 1500);
 });
 
 // LOGIC KHUNG CHAT
@@ -109,7 +142,7 @@ function sendMessage() {
     const nicknameInput = document.getElementById('nickname').value.trim();
     const chatInput = document.getElementById('chatInput');
     const message = chatInput.value.trim();
-    const finalName = nicknameInput === "" ? "Khách Ẩn Danh" : nicknameInput;
+    const finalName = nicknameInput === "" ? "ai đó ( nhập tên vào đây)" : nicknameInput;
 
     if (message !== "") {
         socket.emit('chatMessage', { name: finalName, message: message });
