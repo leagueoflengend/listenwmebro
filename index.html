@@ -19,11 +19,19 @@
         iframe { width: 100%; height: 100%; border: none; border-radius: 8px; }
         .audio-only-mode { display: none !important; }
 
+        /* Tùy chỉnh Khung Danh sách phát mới */
         .playlist-box { margin-top: 20px; text-align: left; background: #1f2335; padding: 15px; border-radius: 8px;}
         .playlist-box h3 { margin: 0 0 10px 0; color: #9ece6a; font-size: 1.1em;}
         ul { list-style: none; padding: 0; margin: 0; }
-        li { padding: 8px; border-bottom: 1px solid #292e42; font-size: 0.9em;}
-        li:last-child { border-bottom: none; }
+        
+        .playlist-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 8px; border-bottom: 1px solid #292e42; font-size: 0.9em; transition: 0.2s;}
+        .playlist-item:hover { background-color: #292e42; border-radius: 6px;}
+        .playlist-item:last-child { border-bottom: none; }
+        .playlist-item-title { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }
+        .playlist-actions button { padding: 4px 8px; font-size: 0.8em; margin-left: 5px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;}
+        .btn-up { background-color: #e0af68; color: #1a1b26; }
+        .btn-del { background-color: #f7768e; color: #1a1b26; }
+
         #statusText { margin-top: 15px; font-size: 0.9em; color: #565f89; }
 
         /* Khung Chat */
