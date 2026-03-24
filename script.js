@@ -4,8 +4,8 @@ const playlistUI = document.getElementById('playlistUI');
 let player; 
 let isSyncing = false; 
 let syncTimeout; 
-let currentVideoId = ''; 
-let initialRoomState = null; // Biến lưu dữ liệu phòng lúc vừa vào
+let currentVideoId = ''; // Biến quan trọng để theo dõi bài đang phát
+let initialRoomState = null; // Lưu dữ liệu phòng lúc vừa vào
 
 // TẢI YOUTUBE API
 var tag = document.createElement('script');
@@ -17,7 +17,13 @@ function onYouTubeIframeAPIReady() {
     player = new YT.Player('player', {
         height: '360',
         width: '640',
-        videoId: 'bwB9EMpW8eY', // YouTube bắt buộc phải có 1 ID ảo ban đầu để tạo khung
+        
+        // ==========================================
+        // ĐÃ SỬA: Dùng Video mặc định là "Khung Trống/Đen"
+        // (ID: y881t8SK8tE - Không tiếng, không hình)
+        videoId: 'y881t8SK8tE', 
+        // ==========================================
+
         playerVars: { 'playsinline': 1, 'autoplay': 0, 'controls': 1 },
         events: {
             'onReady': onPlayerReady,
@@ -39,7 +45,12 @@ function onPlayerReady(event) {
 function applyRoomState(state) {
     isSyncing = true;
     clearTimeout(syncTimeout);
+    
+    // ==========================================
+    // ĐÃ SỬA: Cập nhật currentVideoId NGAY LẬP TỨC 
+    // để tránh bị load đúp hoặc tua sai video.
     currentVideoId = state.videoId;
+    // ==========================================
     
     if (state.isPlaying) {
         // Nếu phòng đang phát -> Load và Phát luôn ở giây hiện tại
@@ -51,7 +62,8 @@ function applyRoomState(state) {
         statusText.innerText = "Trạng thái: Đồng bộ phòng (Đang tạm dừng).";
     }
     
-    syncTimeout = setTimeout(() => isSyncing = false, 2000);
+    // Khóa đồng bộ 1.5 giây để video load ổn định
+    syncTimeout = setTimeout(() => isSyncing = false, 1500);
 }
 
 // Lắng nghe dữ liệu phòng lúc vừa Load Web
@@ -116,6 +128,7 @@ function toggleVideoMode() {
 function onPlayerStateChange(event) {
     if (isSyncing) return; 
     
+    // Chỉ bắt sự kiện khi thực sự Phát/Dừng, bỏ qua lúc đang load video (Buffering)
     if (event.data == YT.PlayerState.PLAYING) {
         socket.emit('play', player.getCurrentTime());
     } else if (event.data == YT.PlayerState.PAUSED) {
@@ -137,6 +150,7 @@ socket.on('changeVideo', (videoId) => {
     player.loadVideoById(videoId);
     statusText.innerText = `Trạng thái: Đang tải bài mới...`;
     
+    // Tăng thời gian khóa đồng bộ cho video mới ổn định
     syncTimeout = setTimeout(() => {
         isSyncing = false;
         statusText.innerText = `Trạng thái: Đang phát.`;
@@ -158,6 +172,7 @@ socket.on('updatePlaylist', (playlist) => {
 socket.on('play', (time) => {
     isSyncing = true;
     clearTimeout(syncTimeout);
+    // Dung sai 1 giây: Lệch ít kệ cho mượt, lệch nhiều mới tua
     if (Math.abs(player.getCurrentTime() - time) > 1.0) player.seekTo(time, true);
     player.playVideo();
     syncTimeout = setTimeout(() => isSyncing = false, 1500);
