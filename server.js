@@ -8,26 +8,18 @@ const io = new Server(server);
 
 app.use(express.static(__dirname));
 
-// Danh sách giờ sẽ chứa cả Tên bài và ID
 let playlist = [];
 
-// ==========================================
-// Đmanager: SỬA KHỐI NÀY
-// BỘ NHỚ CỦA SERVER: Lưu lại trạng thái phòng hiện tại
-// Dùng Video mặc định là "Khung Trống/Đen" trong bộ nhớ Server
-// (y881t8SK8tE - Không tiếng, không hình)
 let roomState = {
     videoId: 'y881t8SK8tE', 
     time: 0,
     isPlaying: false,
     lastUpdate: Date.now()
 };
-// ==========================================
 
 io.on('connection', (socket) => {
     console.log('Một người dùng đã kết nối:', socket.id);
 
-    // Gửi gói dữ liệu phòng ngay khi mới vào
     let currentTime = roomState.time;
     if (roomState.isPlaying) {
         currentTime += (Date.now() - roomState.lastUpdate) / 1000;
@@ -60,11 +52,29 @@ io.on('connection', (socket) => {
         io.emit('updatePlaylist', playlist); 
     });
 
+    // ==========================================
+    // TÍNH NĂNG MỚI: XÓA VÀ ĐƯA LÊN ĐẦU
+    // ==========================================
+    socket.on('removeVideo', (index) => {
+        if (index >= 0 && index < playlist.length) {
+            playlist.splice(index, 1); // Xóa 1 bài tại vị trí index
+            io.emit('updatePlaylist', playlist);
+        }
+    });
+
+    socket.on('moveVideoToTop', (index) => {
+        if (index > 0 && index < playlist.length) {
+            const item = playlist.splice(index, 1)[0]; // Rút bài đó ra
+            playlist.unshift(item); // Nhét lên đầu danh sách
+            io.emit('updatePlaylist', playlist);
+        }
+    });
+    // ==========================================
+
     socket.on('skipVideo', () => {
         if (playlist.length > 0) {
             const nextVideo = playlist.shift(); 
             
-            // Cập nhật bộ nhớ Server
             roomState.videoId = nextVideo.id;
             roomState.time = 0;
             roomState.isPlaying = true;
@@ -76,7 +86,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('changeVideo', (videoId) => {
-        // Cập nhật bộ nhớ Server
         roomState.videoId = videoId;
         roomState.time = 0;
         roomState.isPlaying = true;
@@ -86,7 +95,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('play', (time) => {
-        // Cập nhật bộ nhớ Server
         roomState.time = time;
         roomState.isPlaying = true;
         roomState.lastUpdate = Date.now();
@@ -95,7 +103,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('pause', (time) => {
-        // Cập nhật bộ nhớ Server
         if (time) roomState.time = time;
         roomState.isPlaying = false;
         roomState.lastUpdate = Date.now();
