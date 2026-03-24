@@ -8,39 +8,38 @@ const io = new Server(server);
 
 app.use(express.static(__dirname));
 
+// Danh sách giờ sẽ chứa cả Tên bài và ID
 let playlist = [];
 
+// ==========================================
+// Đmanager: SỬA KHỐI NÀY
 // BỘ NHỚ CỦA SERVER: Lưu lại trạng thái phòng hiện tại
+// Dùng Video mặc định là "Khung Trống/Đen" trong bộ nhớ Server
+// (y881t8SK8tE - Không tiếng, không hình)
 let roomState = {
-    videoId: 'bwB9EMpW8eY', // Bài mặc định khi chưa ai bật gì
+    videoId: 'y881t8SK8tE', 
     time: 0,
     isPlaying: false,
     lastUpdate: Date.now()
 };
+// ==========================================
 
 io.on('connection', (socket) => {
     console.log('Một người dùng đã kết nối:', socket.id);
 
-    // ==========================================
-    // ĐỒNG BỘ NGAY LẬP TỨC CHO NGƯỜI VỪA VÀO PHÒNG
-    // ==========================================
+    // Gửi gói dữ liệu phòng ngay khi mới vào
     let currentTime = roomState.time;
-    // Nếu nhạc đang chạy, tính toán bù trừ thời gian trôi qua từ lần cuối cập nhật
     if (roomState.isPlaying) {
         currentTime += (Date.now() - roomState.lastUpdate) / 1000;
     }
     
-    // Gửi gói dữ liệu chào mừng chứa thông tin video hiện tại
     socket.emit('initRoom', {
         videoId: roomState.videoId,
         time: currentTime,
         isPlaying: roomState.isPlaying
     });
 
-    // Gửi danh sách phát hiện tại
     socket.emit('updatePlaylist', playlist);
-
-    // ==========================================
 
     socket.on('chatMessage', (data) => {
         io.emit('chatMessage', data);
@@ -64,6 +63,7 @@ io.on('connection', (socket) => {
     socket.on('skipVideo', () => {
         if (playlist.length > 0) {
             const nextVideo = playlist.shift(); 
+            
             // Cập nhật bộ nhớ Server
             roomState.videoId = nextVideo.id;
             roomState.time = 0;
