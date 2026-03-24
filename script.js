@@ -5,7 +5,7 @@ let player;
 let isSyncing = false; 
 let syncTimeout; 
 let currentVideoId = ''; // Biến quan trọng để theo dõi bài đang phát
-let initialRoomState = null; // Lưu dữ liệu phòng lúc vừa vào
+let initialRoomState = null; // Biến lưu dữ liệu phòng lúc vừa vào
 
 // TẢI YOUTUBE API
 var tag = document.createElement('script');
@@ -19,8 +19,8 @@ function onYouTubeIframeAPIReady() {
         width: '640',
         
         // ==========================================
-        // ĐÃ SỬA: Dùng Video mặc định là "Khung Trống/Đen"
-        // (ID: y881t8SK8tE - Không tiếng, không hình)
+        // Dùng Video mặc định là "Khung Trống/Đen" lúc khởi tạo
+        // (y881t8SK8tE - Không tiếng, không hình)
         videoId: 'y881t8SK8tE', 
         // ==========================================
 
@@ -46,11 +46,8 @@ function applyRoomState(state) {
     isSyncing = true;
     clearTimeout(syncTimeout);
     
-    // ==========================================
-    // ĐÃ SỬA: Cập nhật currentVideoId NGAY LẬP TỨC 
-    // để tránh bị load đúp hoặc tua sai video.
+    // Cập nhật currentVideoId NGAY LẬP TỨC 
     currentVideoId = state.videoId;
-    // ==========================================
     
     if (state.isPlaying) {
         // Nếu phòng đang phát -> Load và Phát luôn ở giây hiện tại
