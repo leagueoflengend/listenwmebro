@@ -4,10 +4,9 @@ const playlistUI = document.getElementById('playlistUI');
 let player; 
 let isSyncing = false; 
 let syncTimeout; 
-let currentVideoId = ''; // Biến quan trọng để theo dõi bài đang phát
-let initialRoomState = null; // Biến lưu dữ liệu phòng lúc vừa vào
+let currentVideoId = ''; 
+let initialRoomState = null; 
 
-// TẢI YOUTUBE API
 var tag = document.createElement('script');
 tag.src = "https://www.youtube.com/iframe_api";
 var firstScriptTag = document.getElementsByTagName('script')[0];
@@ -17,13 +16,7 @@ function onYouTubeIframeAPIReady() {
     player = new YT.Player('player', {
         height: '360',
         width: '640',
-        
-        // ==========================================
-        // Dùng Video mặc định là "Khung Trống/Đen" lúc khởi tạo
-        // (y881t8SK8tE - Không tiếng, không hình)
         videoId: 'y881t8SK8tE', 
-        // ==========================================
-
         playerVars: { 'playsinline': 1, 'autoplay': 0, 'controls': 1 },
         events: {
             'onReady': onPlayerReady,
@@ -33,7 +26,6 @@ function onYouTubeIframeAPIReady() {
 }
 
 function onPlayerReady(event) {
-    // Nếu máy chủ đã gửi thông tin phòng, áp dụng ngay lập tức
     if (initialRoomState) {
         applyRoomState(initialRoomState);
     } else {
@@ -41,38 +33,29 @@ function onPlayerReady(event) {
     }
 }
 
-// Hàm Xử Lý Gói Dữ Liệu Máy Chủ Gửi Lúc Mới Vào
 function applyRoomState(state) {
     isSyncing = true;
     clearTimeout(syncTimeout);
     
-    // Cập nhật currentVideoId NGAY LẬP TỨC 
     currentVideoId = state.videoId;
     
     if (state.isPlaying) {
-        // Nếu phòng đang phát -> Load và Phát luôn ở giây hiện tại
         player.loadVideoById(state.videoId, state.time);
         statusText.innerText = "Trạng thái: Đã đồng bộ vào phòng trực tiếp.";
     } else {
-        // Nếu phòng đang dừng -> Chỉ load sẵn video ở giây hiện tại (cueVideo)
         player.cueVideoById(state.videoId, state.time);
         statusText.innerText = "Trạng thái: Đồng bộ phòng (Đang tạm dừng).";
     }
-    
-    // Khóa đồng bộ 1.5 giây để video load ổn định
     syncTimeout = setTimeout(() => isSyncing = false, 1500);
 }
 
-// Lắng nghe dữ liệu phòng lúc vừa Load Web
 socket.on('initRoom', (state) => {
     initialRoomState = state;
-    // Nếu API YouTube tải nhanh hơn Socket, cập nhật luôn
     if (player && player.loadVideoById) {
         applyRoomState(state);
     }
 });
 
-// CÁC HÀM NÚT BẤM CƠ BẢN
 function getValidId() {
     const linkInput = document.getElementById('youtubeLink').value;
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
@@ -121,22 +104,17 @@ function toggleVideoMode() {
     }
 }
 
-// BẮT SỰ KIỆN TỪ NGƯỜI DÙNG
 function onPlayerStateChange(event) {
     if (isSyncing) return; 
-    
-    // Chỉ bắt sự kiện khi thực sự Phát/Dừng, bỏ qua lúc đang load video (Buffering)
     if (event.data == YT.PlayerState.PLAYING) {
         socket.emit('play', player.getCurrentTime());
     } else if (event.data == YT.PlayerState.PAUSED) {
-        // Gửi luôn số giây hiện tại lên để server nhớ chính xác lúc pause
         socket.emit('pause', player.getCurrentTime());
     } else if (event.data == YT.PlayerState.ENDED) {
         skipVideo(); 
     }
 }
 
-// BẮT SỰ KIỆN TỪ SERVER ĐANG CHẠY
 socket.on('changeVideo', (videoId) => {
     if (currentVideoId === videoId) return; 
     currentVideoId = videoId;
@@ -147,29 +125,59 @@ socket.on('changeVideo', (videoId) => {
     player.loadVideoById(videoId);
     statusText.innerText = `Trạng thái: Đang tải bài mới...`;
     
-    // Tăng thời gian khóa đồng bộ cho video mới ổn định
     syncTimeout = setTimeout(() => {
         isSyncing = false;
         statusText.innerText = `Trạng thái: Đang phát.`;
     }, 2500); 
 });
 
+// ==========================================
+// ĐÃ SỬA: Tích hợp Nút bấm vào Danh sách phát
+// ==========================================
 socket.on('updatePlaylist', (playlist) => {
     playlistUI.innerHTML = ''; 
     if (playlist.length === 0) {
-        playlistUI.innerHTML = '<li>Danh sách đang trống...</li>'; return;
+        playlistUI.innerHTML = '<li style="padding: 10px;">Danh sách đang trống...</li>'; return;
     }
     playlist.forEach((item, index) => {
         const li = document.createElement('li');
-        li.innerText = `${index + 1}. 🎵 ${item.title}`;
+        li.className = 'playlist-item';
+        
+        // Tên bài hát
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'playlist-item-title';
+        titleSpan.innerText = `${index + 1}. 🎵 ${item.title}`;
+        
+        // Cụm chứa 2 nút bấm
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'playlist-actions';
+        
+        // Chỉ hiện nút "Ưu tiên" nếu không phải bài đầu tiên
+        if (index > 0) {
+            const upBtn = document.createElement('button');
+            upBtn.className = 'btn-up';
+            upBtn.innerText = '⬆️ Ưu tiên';
+            upBtn.onclick = () => socket.emit('moveVideoToTop', index); // Bấm phát là đẩy số index lên server
+            actionsDiv.appendChild(upBtn);
+        }
+        
+        // Nút Xóa (bài nào cũng có)
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn-del';
+        delBtn.innerText = '❌ Xóa';
+        delBtn.onclick = () => socket.emit('removeVideo', index);
+        actionsDiv.appendChild(delBtn);
+        
+        li.appendChild(titleSpan);
+        li.appendChild(actionsDiv);
         playlistUI.appendChild(li);
     });
 });
+// ==========================================
 
 socket.on('play', (time) => {
     isSyncing = true;
     clearTimeout(syncTimeout);
-    // Dung sai 1 giây: Lệch ít kệ cho mượt, lệch nhiều mới tua
     if (Math.abs(player.getCurrentTime() - time) > 1.0) player.seekTo(time, true);
     player.playVideo();
     syncTimeout = setTimeout(() => isSyncing = false, 1500);
@@ -182,7 +190,6 @@ socket.on('pause', () => {
     syncTimeout = setTimeout(() => isSyncing = false, 1500);
 });
 
-// LOGIC KHUNG CHAT
 function sendMessage() {
     const nicknameInput = document.getElementById('nickname').value.trim();
     const chatInput = document.getElementById('chatInput');
