@@ -1,151 +1,162 @@
-require('dotenv').config();
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const { google } = require('googleapis');
+const socket = io();
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+let myName = "";
+let player;
+let playerReady = false;
+let pendingInit = null;
+let isSyncing = false;
 
-const youtube = google.youtube({
-    version: 'v3',
-    auth: process.env.YOUTUBE_API_KEY
-});
+// ================= JOIN =================
+function joinRoom() {
+    const input = document.getElementById("joinNameInput");
+    const name = input.value.trim();
 
-app.use(express.static(__dirname));
+    if (!name) {
+        alert("Nhập tên đi bro 😅");
+        return;
+    }
 
-let playlist = [];
-let users = {};
-let roomState = {
-    videoId: null,
-    time: 0,
-    isPlaying: false,
-    lastUpdate: Date.now()
-};
+    myName = name;
 
-function getCurrentTime() {
-    if (!roomState.isPlaying) return roomState.time;
-    return roomState.time + (Date.now() - roomState.lastUpdate) / 1000;
+    socket.emit("join", name); // 🔥 QUAN TRỌNG
+
+    document.getElementById("joinModal").style.display = "none";
 }
 
-io.on('connection', (socket) => {
+// ================= USER =================
+socket.on("updateUserList", (list) => {
+    document.getElementById("userCount").innerText = list.length;
+});
 
-    socket.on('join', (name) => {
-        users[socket.id] = name || "Khách";
-        io.emit('updateUserList', Object.values(users));
+// ================= YOUTUBE =================
+function onYouTubeIframeAPIReady() {
+    player = new YT.Player("player", {
+        events: {
+            onReady: () => {
+                playerReady = true;
 
-        socket.emit('initRoom', {
-            videoId: roomState.videoId,
-            time: getCurrentTime(),
-            isPlaying: roomState.isPlaying
-        });
-
-        socket.emit('updatePlaylist', playlist);
-    });
-
-    socket.on('searchSong', async (q) => {
-        try {
-            const res = await youtube.search.list({
-                part: 'snippet',
-                q,
-                maxResults: 5,
-                type: 'video'
-            });
-
-            const ids = res.data.items.map(i => i.id.videoId).join(',');
-
-            const vRes = await youtube.videos.list({
-                part: 'contentDetails,snippet',
-                id: ids
-            });
-
-            const results = vRes.data.items.map(v => ({
-                id: v.id,
-                title: v.snippet.title,
-                thumbnail: v.snippet.thumbnails.medium.url,
-                author: v.snippet.channelTitle,
-                duration: v.contentDetails.duration
-            }));
-
-            socket.emit('searchResults', results);
-        } catch (e) {
-            socket.emit('searchError', e.message);
+                if (pendingInit) {
+                    startRoom(pendingInit);
+                    pendingInit = null;
+                }
+            },
+            onStateChange: onPlayerStateChange
         }
     });
+}
 
-    // 🔥 AUTO PLAY LOGIC
-    socket.on('addToList', async (id) => {
-        const res = await youtube.videos.list({ part: 'snippet', id });
+function onPlayerStateChange(e) {
+    if (isSyncing) return;
 
-        if (!res.data.items[0]) return;
+    if (e.data === YT.PlayerState.PLAYING) {
+        socket.emit("play", player.getCurrentTime());
+    }
 
-        const video = {
-            id,
-            title: res.data.items[0].snippet.title
+    if (e.data === YT.PlayerState.PAUSED) {
+        socket.emit("pause", player.getCurrentTime());
+    }
+}
+
+// ================= SYNC =================
+socket.on("initRoom", (data) => {
+    if (!playerReady) {
+        pendingInit = data;
+        return;
+    }
+    startRoom(data);
+});
+
+socket.on("changeVideo", (id) => {
+    loadVideo(id, 0, true);
+});
+
+socket.on("play", (t) => {
+    syncTo(t, true);
+});
+
+socket.on("pause", () => {
+    player.pauseVideo();
+});
+
+function startRoom(data) {
+    if (!data.videoId) return;
+
+    loadVideo(data.videoId, data.time, data.isPlaying);
+}
+
+function loadVideo(id, time = 0, play = true) {
+    isSyncing = true;
+
+    player.loadVideoById({
+        videoId: id,
+        startSeconds: time
+    });
+
+    setTimeout(() => {
+        if (play) player.playVideo();
+        else player.pauseVideo();
+        isSyncing = false;
+    }, 1200);
+}
+
+function syncTo(time, play) {
+    isSyncing = true;
+
+    player.seekTo(time, true);
+    if (play) player.playVideo();
+
+    setTimeout(() => isSyncing = false, 500);
+}
+
+// ================= SEARCH =================
+function searchSong() {
+    const q = document.getElementById("youtubeLink").value.trim();
+    if (!q) return;
+
+    socket.emit("searchSong", q);
+}
+
+socket.on("searchResults", (list) => {
+    const box = document.getElementById("searchResultsBox");
+    box.innerHTML = "";
+    box.style.display = "block";
+
+    list.forEach(v => {
+        const div = document.createElement("div");
+        div.className = "search-item";
+        div.innerHTML = `<img src="${v.thumbnail}" width="80">
+            <div><b>${v.title}</b></div>`;
+
+        div.onclick = () => {
+            socket.emit("addToList", v.id);
+            box.style.display = "none";
         };
 
-        // 👉 nếu chưa có gì phát → phát luôn
-        if (!roomState.videoId) {
-            roomState = {
-                videoId: id,
-                time: 0,
-                isPlaying: true,
-                lastUpdate: Date.now()
-            };
-            io.emit('changeVideo', id);
-        } else {
-            // 👉 đang phát → thêm vào queue
-            playlist.push(video);
-            io.emit('updatePlaylist', playlist);
-        }
-    });
-
-    socket.on('changeVideo', (id) => {
-        roomState = {
-            videoId: id,
-            time: 0,
-            isPlaying: true,
-            lastUpdate: Date.now()
-        };
-        io.emit('changeVideo', id);
-    });
-
-    socket.on('play', (t) => {
-        roomState.isPlaying = true;
-        roomState.time = t;
-        roomState.lastUpdate = Date.now();
-        socket.broadcast.emit('play', t);
-    });
-
-    socket.on('pause', (t) => {
-        roomState.isPlaying = false;
-        roomState.time = t;
-        roomState.lastUpdate = Date.now();
-        socket.broadcast.emit('pause');
-    });
-
-    socket.on('skipVideo', () => {
-        if (playlist.length > 0) {
-            const next = playlist.shift();
-            roomState = {
-                videoId: next.id,
-                time: 0,
-                isPlaying: true,
-                lastUpdate: Date.now()
-            };
-            io.emit('changeVideo', next.id);
-            io.emit('updatePlaylist', playlist);
-        } else {
-            roomState.videoId = null;
-            roomState.isPlaying = false;
-        }
-    });
-
-    socket.on('disconnect', () => {
-        delete users[socket.id];
-        io.emit('updateUserList', Object.values(users));
+        box.appendChild(div);
     });
 });
 
-server.listen(process.env.PORT || 10000);
+// ================= CHAT =================
+function sendMessage() {
+    const input = document.getElementById("chatInput");
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    socket.emit("chatMessage", { name: myName, message: msg });
+    input.value = "";
+}
+
+socket.on("chatMessage", (d) => {
+    const box = document.getElementById("chatMessages");
+
+    const div = document.createElement("div");
+    div.innerHTML = `<b>${d.name}:</b> ${d.message}`;
+
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+});
+
+// ================= YOUTUBE LOAD =================
+const tag = document.createElement("script");
+tag.src = "https://www.youtube.com/iframe_api";
+document.body.appendChild(tag);
