@@ -1,136 +1,103 @@
-const socket = io();
-const sInput = document.getElementById("sQueryInput");
-const rBox = document.getElementById("results");
-const chatBox = document.getElementById("chatMsgs");
-const userCount = document.getElementById("userCount");
-const userList = document.getElementById("userList");
+require('dotenv').config();
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const { google } = require('googleapis');
 
-let myName = "";
-let player;
-let syncing = false;
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+const youtube = google.youtube({ version: 'v3', auth: process.env.YOUTUBE_API_KEY });
 
-// 1. JOIN
-function handleJoin() {
-    myName = document.getElementById("uNameInput").value.trim();
-    if (!myName) return;
-    socket.emit("join", myName);
-    document.getElementById("join").style.display = "none";
+app.use(express.static(__dirname));
+
+let playlist = [];
+let users = {};
+let roomState = { videoId: null, time: 0, isPlaying: false, lastUpdate: Date.now() };
+
+// Hàm chuyển bài tự động
+function playNext() {
+    if (playlist.length > 0) {
+        const next = playlist.shift();
+        roomState = { 
+            videoId: next.id, 
+            time: 0, 
+            isPlaying: true, 
+            lastUpdate: Date.now() 
+        };
+        io.emit("changeVideo", next.id);
+        io.emit("updateQueue", playlist);
+    } else {
+        // Nếu hết bài, đưa trạng thái về trống
+        roomState.videoId = null;
+        roomState.isPlaying = false;
+        io.emit("updateQueue", []);
+    }
 }
 
-// 2. YOUTUBE API
-function onYouTubeIframeAPIReady() {
-    player = new YT.Player("player", {
-        events: {
-            onStateChange: e => {
-                if (syncing) return;
-                if (e.data === 1) socket.emit("play", player.getCurrentTime());
-                if (e.data === 2) socket.emit("pause", player.getCurrentTime());
-                if (e.data === 0) socket.emit("ended");
-            }
+io.on('connection', socket => {
+    socket.on("join", name => {
+        users[socket.id] = name || "Khách";
+        io.emit("updateUserList", Object.values(users));
+        
+        // Gửi trạng thái hiện tại cho người mới vào
+        socket.emit("initRoom", { 
+            videoId: roomState.videoId, 
+            time: roomState.isPlaying ? roomState.time + (Date.now() - roomState.lastUpdate)/1000 : roomState.time, 
+            isPlaying: roomState.isPlaying 
+        });
+        socket.emit("updateQueue", playlist);
+    });
+
+    socket.on("searchSong", async q => {
+        try {
+            const res = await youtube.search.list({ part: 'snippet', q, maxResults: 5, type: 'video' });
+            const results = res.data.items.map(v => ({ 
+                id: v.id.videoId, 
+                title: v.snippet.title, 
+                thumbnail: v.snippet.thumbnails.medium.url 
+            }));
+            socket.emit("searchResults", results);
+        } catch (e) { socket.emit("searchResults", []); }
+    });
+
+    socket.on("addToQueue", item => {
+        playlist.push(item);
+        io.emit("updateQueue", playlist);
+
+        // NẾU PHÒNG ĐANG TRỐNG (Không có videoId), TỰ ĐỘNG PHÁT LUÔN
+        if (!roomState.videoId) {
+            playNext();
         }
     });
-}
 
-// 3. SEARCH & PLAY
-function handleSearch() {
-    const q = sInput.value.trim();
-    if (!q) return;
-    rBox.classList.add("active");
-    rBox.innerHTML = '<p style="text-align:center; padding:15px;">🔍 Đang tìm...</p>';
-    socket.emit("searchSong", q);
-}
+    socket.on("changeVideo", id => {
+        roomState = { videoId: id, time: 0, isPlaying: true, lastUpdate: Date.now() };
+        io.emit("changeVideo", id);
+    });
 
-socket.on("searchResults", list => {
-    rBox.innerHTML = "";
-    if (list.length === 0) { rBox.innerHTML = '<p style="padding:15px;">Không thấy bài nào.</p>'; return; }
-    list.forEach(v => {
-        const d = document.createElement("div");
-        d.className = "result-item";
-        d.innerHTML = `<img src="${v.thumbnail}" width="80"><div><b style="font-size:0.85em">${v.title}</b></div>`;
-        d.onclick = () => {
-            socket.emit("addToQueue", v);
-            rBox.classList.remove("active");
-            sInput.value = "";
-        };
-        rBox.appendChild(d);
+    socket.on("play", t => { 
+        roomState.time = t; 
+        roomState.isPlaying = true; 
+        roomState.lastUpdate = Date.now(); 
+        socket.broadcast.emit("play", t); 
+    });
+
+    socket.on("pause", t => { 
+        roomState.time = t; 
+        roomState.isPlaying = false; 
+        socket.broadcast.emit("pause", t); 
+    });
+
+    socket.on("skip", () => playNext());
+    socket.on("ended", () => playNext()); // Tự động phát tiếp khi kết thúc bài
+
+    socket.on("chatMessage", d => io.emit("chatMessage", d));
+    
+    socket.on("disconnect", () => {
+        delete users[socket.id];
+        io.emit("updateUserList", Object.values(users));
     });
 });
 
-function handlePlayNow() {
-    const q = sInput.value.trim();
-    const match = q.match(/(?:https?:\/\/)?(?:www\.)?youtu\.?be(?:\.com)?\/?.*(?:watch|embed)?(?:.*v=|v\/|vi\/|u\/\w\/|shorts\/|e\/|(?:\?|&)v=)([^#\&\?]*).*/);
-    if (match && match[1]) {
-        socket.emit("changeVideo", match[1]);
-        sInput.value = "";
-    }
-}
-
-// 4. SYNC
-socket.on("initRoom", d => {
-    if (d.videoId) {
-        syncing = true;
-        player.loadVideoById({ videoId: d.videoId, startSeconds: d.time });
-        if (!d.isPlaying) setTimeout(() => player.pauseVideo(), 800);
-        setTimeout(() => syncing = false, 1500);
-    }
-});
-
-socket.on("changeVideo", id => {
-    syncing = true;
-    player.loadVideoById(id);
-    setTimeout(() => syncing = false, 1000);
-});
-
-socket.on("play", t => {
-    syncing = true;
-    if (Math.abs(player.getCurrentTime() - t) > 1.5) player.seekTo(t, true);
-    player.playVideo();
-    setTimeout(() => syncing = false, 1000);
-});
-
-socket.on("pause", () => {
-    syncing = true;
-    player.pauseVideo();
-    setTimeout(() => syncing = false, 1000);
-});
-
-// 5. QUEUE, ONLINE & CHAT
-socket.on("updateQueue", list => {
-    document.getElementById("queue").innerHTML = list.map(v => `
-        <div style="display:flex; gap:10px; margin-bottom:10px; align-items:center;">
-            <img src="${v.thumbnail}" width="50" style="border-radius:4px">
-            <div style="font-size:0.75em; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">${v.title}</div>
-        </div>
-    `).join("") || "Trống...";
-});
-
-socket.on("updateUserList", names => {
-    userCount.innerText = names.length;
-    userList.innerText = names.join(", ");
-});
-
-function handleSkip() { socket.emit("skip"); }
-
-function handleSend() {
-    let m = document.getElementById("mInput").value.trim();
-    if (!m) return;
-    const emoj = { ":D":"😄",":)":"🙂",":(":"😟","<3":"❤️" };
-    Object.keys(emoj).forEach(k => m = m.replaceAll(k, emoj[k]));
-    socket.emit("chatMessage", { name: myName, message: m });
-    document.getElementById("mInput").value = "";
-}
-
-socket.on("chatMessage", d => {
-    const div = document.createElement("div");
-    div.className = `msg ${d.name === myName ? 'me' : 'other'}`;
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    div.innerHTML = `<b>${d.name}:</b> ${d.message} <span class="msg-time">${time}</span>`;
-    chatBox.appendChild(div);
-    chatBox.scrollTop = chatBox.scrollHeight;
-});
-
-window.onclick = e => { if (!rBox.contains(e.target) && e.target !== sInput) rBox.classList.remove("active"); };
-
-const tag = document.createElement("script");
-tag.src = "https://www.youtube.com/iframe_api";
-document.body.appendChild(tag);
+server.listen(process.env.PORT || 10000);
