@@ -1,77 +1,128 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>🎵 Listen With Me</title>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
 <style>
+:root {
+    --bg: #f1f5f9;
+    --card: #ffffff;
+    --text: #1e293b;
+    --sub: #64748b;
+    --accent: #6366f1;
+}
+
+body.dark {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --text: #e2e8f0;
+    --sub: #94a3b8;
+    --accent: #818cf8;
+}
+
 body {
     margin: 0;
     font-family: 'Segoe UI', sans-serif;
-    background: #0f172a;
-    color: #e2e8f0;
+    background: var(--bg);
+    color: var(--text);
+    transition: 0.3s;
 }
 
 /* LOGIN */
 #joinModal {
     position: fixed;
     inset: 0;
-    background: #0f172a;
+    background: var(--bg);
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-.modal-content {
-    background: #1e293b;
-    padding: 30px;
-    border-radius: 12px;
+.modal {
+    background: var(--card);
+    padding: 25px;
+    border-radius: 16px;
     width: 320px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
 }
 
-.modal-content input {
+.modal input {
     width: 100%;
     padding: 12px;
-    border-radius: 8px;
+    border-radius: 10px;
     border: none;
-    background: #0f172a;
-    color: white;
-    margin-bottom: 15px;
+    background: var(--bg);
+    margin: 15px 0;
+    color: var(--text);
 }
 
-.modal-content button {
+.modal button {
     width: 100%;
-    padding: 12px;
-    background: #3b82f6;
-    border: none;
-    border-radius: 8px;
-    color: white;
-    font-weight: bold;
 }
 
 /* MAIN */
 .container {
     max-width: 700px;
     margin: auto;
+    padding: 20px;
 }
 
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.theme-btn {
+    cursor: pointer;
+    font-size: 18px;
+}
+
+/* PLAYER */
+.player-box {
+    margin-top: 15px;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+/* INPUT */
 .controls {
     display: flex;
     gap: 10px;
-    margin-bottom: 10px;
+    margin-top: 15px;
 }
 
 input {
     flex: 1;
-    padding: 10px;
-    border-radius: 8px;
+    padding: 12px;
+    border-radius: 10px;
     border: none;
-    background: #1e293b;
-    color: white;
+    background: var(--card);
+    color: var(--text);
 }
 
 button {
-    background: #3b82f6;
+    padding: 12px 16px;
+    border-radius: 10px;
     border: none;
-    padding: 10px;
-    border-radius: 8px;
+    background: var(--accent);
     color: white;
     cursor: pointer;
+}
+
+/* SEARCH */
+.search-results {
+    background: var(--card);
+    border-radius: 10px;
+    margin-top: 10px;
+    overflow: hidden;
 }
 
 .search-item {
@@ -82,6 +133,99 @@ button {
 }
 
 .search-item:hover {
-    background: #1e293b;
+    background: var(--bg);
+}
+
+/* PLAYLIST */
+.playlist {
+    margin-top: 15px;
+    background: var(--card);
+    padding: 10px;
+    border-radius: 12px;
+}
+
+.playlist li {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px;
+}
+
+/* CHAT */
+.chat {
+    margin-top: 15px;
+    background: var(--card);
+    border-radius: 12px;
+    padding: 10px;
+}
+
+.chat-box {
+    height: 120px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+    font-size: 14px;
 }
 </style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div id="joinModal">
+    <div class="modal">
+        <h2>🎵 Listen With Me</h2>
+        <input id="joinNameInput" placeholder="Tên của bạn...">
+        <button onclick="joinRoom()">Vào phòng</button>
+    </div>
+</div>
+
+<div class="container">
+
+    <div class="header">
+        <h2>🎵 Listen Room</h2>
+        <div class="theme-btn" onclick="toggleTheme()">🌙</div>
+    </div>
+
+    <div>👥 <span id="userCount">0</span> người</div>
+
+    <div class="controls">
+        <input id="youtubeLink" placeholder="Tìm bài hoặc dán link...">
+        <button onclick="searchSong()">🔍</button>
+        <button onclick="playNow()">▶</button>
+    </div>
+
+    <div id="searchResultsBox" class="search-results"></div>
+
+    <div class="player-box">
+        <div id="player"></div>
+    </div>
+
+    <div class="controls">
+        <button onclick="skipVideo()">⏭️ Skip</button>
+    </div>
+
+    <div class="playlist">
+        <b>📜 Hàng chờ</b>
+        <ul id="playlistUI"></ul>
+    </div>
+
+    <div class="chat">
+        <div id="chatMessages" class="chat-box"></div>
+        <div class="controls">
+            <input id="chatInput" placeholder="Nhắn tin..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <button onclick="sendMessage()">Gửi</button>
+        </div>
+    </div>
+
+</div>
+
+<script src="script.js"></script>
+
+<script>
+// 🌙 DARK MODE
+function toggleTheme() {
+    document.body.classList.toggle("dark");
+}
+</script>
+
+</body>
+</html>
