@@ -10,7 +10,7 @@
 
 <style>
 :root {
-    --bg: #f8fafc;
+    --bg: #f1f5f9;
     --card: #ffffff;
     --text: #0f172a;
     --sub: #64748b;
@@ -25,59 +25,43 @@ body.dark {
     --accent: #818cf8;
 }
 
-* {
-    box-sizing: border-box;
-}
-
 body {
     margin: 0;
-    font-family: system-ui, sans-serif;
+    font-family: system-ui;
     background: var(--bg);
     color: var(--text);
 }
 
-/* ===== LOGIN ===== */
+/* LOGIN */
 #joinModal {
     position: fixed;
     inset: 0;
     display: flex;
-    align-items: center;
     justify-content: center;
-    background: rgba(0,0,0,0.25);
+    align-items: center;
+    background: rgba(0,0,0,0.3);
 }
 
 .modal {
-    width: 340px;
+    width: 320px;
     background: var(--card);
-    padding: 30px;
-    border-radius: 20px;
+    padding: 25px;
+    border-radius: 16px;
     text-align: center;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
-}
-
-.modal h2 {
-    margin: 0;
 }
 
 .modal input {
     width: 100%;
-    margin-top: 20px;
-    padding: 14px;
-    border-radius: 12px;
+    margin-top: 15px;
+    padding: 12px;
+    border-radius: 10px;
     border: none;
     background: var(--bg);
-    font-size: 15px;
-    color: var(--text);
 }
 
-.modal button {
-    margin-top: 15px;
-    width: 100%;
-}
-
-/* ===== MAIN ===== */
+/* MAIN */
 .container {
-    max-width: 720px;
+    max-width: 760px;
     margin: auto;
     padding: 20px;
 }
@@ -89,103 +73,86 @@ body {
     align-items: center;
 }
 
-.header h2 {
-    margin: 0;
-}
-
-.theme-btn {
-    font-size: 20px;
-    cursor: pointer;
-}
-
-/* INPUT ROW */
+/* INPUT */
 .controls {
     display: flex;
     gap: 10px;
-    margin-top: 20px;
+    margin-top: 15px;
 }
 
-.controls input {
-    flex: 1;
-}
-
-/* INPUT + BUTTON */
 input {
-    padding: 14px;
-    border-radius: 12px;
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
     border: none;
-    background: var(--card);
-    color: var(--text);
-    font-size: 15px;
 }
 
 button {
-    padding: 14px 18px;
-    border-radius: 12px;
+    padding: 12px 16px;
     border: none;
+    border-radius: 10px;
     background: var(--accent);
     color: white;
-    font-weight: 600;
     cursor: pointer;
-    transition: 0.2s;
 }
 
-button:hover {
-    transform: scale(1.05);
-}
-
-/* PLAYER */
+/* PLAYER FIX */
 .player-box {
-    margin-top: 20px;
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 15px 40px rgba(0,0,0,0.25);
-}
-
-/* SEARCH */
-.search-results {
-    margin-top: 10px;
-    background: var(--card);
+    margin-top: 15px;
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: black;
     border-radius: 12px;
     overflow: hidden;
 }
 
-.search-item {
-    display: flex;
-    gap: 10px;
-    padding: 10px;
-    cursor: pointer;
-}
-
-.search-item:hover {
-    background: var(--bg);
-}
-
-/* PLAYLIST */
-.playlist {
-    margin-top: 20px;
-    background: var(--card);
-    padding: 15px;
-    border-radius: 16px;
+#player {
+    width: 100% !important;
+    height: 100% !important;
 }
 
 /* CHAT */
 .chat {
     margin-top: 20px;
     background: var(--card);
-    padding: 15px;
-    border-radius: 16px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    height: 260px;
 }
 
 .chat-box {
-    height: 130px;
+    flex: 1;
     overflow-y: auto;
-    margin-bottom: 10px;
+    padding: 10px;
 }
 
-/* BUTTON ROW */
-.actions {
-    margin-top: 15px;
+.chat-item {
+    max-width: 75%;
+    padding: 10px;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    background: var(--bg);
+}
+
+.chat-item.me {
+    margin-left: auto;
+    background: var(--accent);
+    color: white;
+}
+
+.chat-header {
+    font-size: 11px;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+}
+
+.chat-input {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
 }
 </style>
 </head>
@@ -195,51 +162,41 @@ button:hover {
 <!-- LOGIN -->
 <div id="joinModal">
     <div class="modal">
-        <h2>🎵 Listen Together</h2>
-        <input id="joinNameInput" placeholder="Nhập tên của bạn...">
+        <h3>🎵 Nhập tên</h3>
+        <input id="joinNameInput">
         <button onclick="joinRoom()">Vào phòng</button>
     </div>
 </div>
 
 <div class="container">
 
-    <div class="header">
-        <h2>🎵 Listen Room</h2>
-        <div class="theme-btn" onclick="toggleTheme()">🌙</div>
+<div class="header">
+    <h2>🎵 Listen Room</h2>
+    <button onclick="toggleTheme()">🌙</button>
+</div>
+
+<p>👥 <span id="userCount">0</span></p>
+
+<div class="controls">
+    <input id="youtubeLink" placeholder="Tìm bài...">
+    <button onclick="searchSong()">🔍</button>
+</div>
+
+<div id="searchResultsBox"></div>
+
+<div class="player-box">
+    <div id="player"></div>
+</div>
+
+<div class="chat">
+    <div id="chatMessages" class="chat-box"></div>
+
+    <div class="chat-input">
+        <input id="chatInput"
+            onkeypress="if(event.key==='Enter') sendMessage()">
+        <button onclick="sendMessage()">Gửi</button>
     </div>
-
-    <p>👥 <span id="userCount">0</span> người</p>
-
-    <div class="controls">
-        <input id="youtubeLink" placeholder="Tìm bài hoặc dán link...">
-        <button onclick="searchSong()">🔍</button>
-        <button onclick="playNow()">▶</button>
-    </div>
-
-    <div id="searchResultsBox" class="search-results"></div>
-
-    <div class="player-box">
-        <div id="player"></div>
-    </div>
-
-    <div class="actions">
-        <button onclick="skipVideo()">⏭️ Skip</button>
-    </div>
-
-    <div class="playlist">
-        <b>📜 Hàng chờ</b>
-        <ul id="playlistUI"></ul>
-    </div>
-
-    <div class="chat">
-        <div id="chatMessages" class="chat-box"></div>
-
-        <div class="controls">
-            <input id="chatInput" placeholder="Nhắn tin..."
-                onkeypress="if(event.key==='Enter') sendMessage()">
-            <button onclick="sendMessage()">Gửi</button>
-        </div>
-    </div>
+</div>
 
 </div>
 
