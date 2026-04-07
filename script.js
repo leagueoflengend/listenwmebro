@@ -6,7 +6,159 @@ const nameInput = document.getElementById("name");
 const searchInput = document.getElementById("search");
 const resultsBox = document.getElementById("results");
 const queueBox = document.getElementById("queue");
-const chatBox = document.getElementById("chatMessages");
+const chatBox = document.getElementById("chatMessages");const socket = io();
+
+const searchInput = document.getElementById("searchInputField");
+const resultsBox = document.getElementById("results");
+const chatMessages = document.getElementById("chatMessages");
+const statusText = document.getElementById("statusText");
+
+let myName = "";
+let player;
+let syncing = false;
+
+// 1. JOIN
+function joinRoom() {
+    myName = document.getElementById("userNameInput").value.trim();
+    if (!myName) return alert("Vui lòng nhập tên!");
+    socket.emit("join", myName);
+    document.getElementById("join").style.display = "none";
+}
+
+// 2. YOUTUBE API
+function onYouTubeIframeAPIReady() {
+    player = new YT.Player("player", {
+        height: '100%', width: '100%',
+        events: {
+            onStateChange: e => {
+                if (syncing) return;
+                if (e.data === 1) socket.emit("play", player.getCurrentTime());
+                if (e.data === 2) socket.emit("pause", player.getCurrentTime());
+                if (e.data === 0) socket.emit("ended");
+            }
+        }
+    });
+}
+
+// 3. SEARCH & PLAY
+function searchSong() {
+    const q = searchInput.value.trim();
+    if (!q) return;
+    resultsBox.classList.add("active");
+    resultsBox.innerHTML = '<div style="padding:15px; text-align:center;">🔍 Đang tìm...</div>';
+    socket.emit("searchSong", q);
+}
+
+socket.on("searchResults", list => {
+    resultsBox.innerHTML = "";
+    if (list.length === 0) return resultsBox.innerHTML = '<div style="padding:15px;">Không thấy kết quả</div>';
+    list.forEach(v => {
+        const d = document.createElement("div");
+        d.className = "result-item";
+        d.innerHTML = `<img src="${v.thumbnail}"><div><b>${v.title}</b><br><small>${v.duration || ''}</small></div>`;
+        d.onclick = () => {
+            socket.emit("addToQueue", v);
+            resultsBox.classList.remove("active");
+            searchInput.value = "";
+        };
+        resultsBox.appendChild(d);
+    });
+});
+
+function playNow() {
+    const q = searchInput.value.trim();
+    const id = getYTId(q);
+    if (id) {
+        socket.emit("changeVideo", id);
+        searchInput.value = "";
+    } else { alert("Dán link YouTube chuẩn vào ô tìm kiếm bạn ơi!"); }
+}
+
+function getYTId(url) {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+}
+
+// 4. SYNC
+socket.on("changeVideo", id => {
+    syncing = true;
+    player.loadVideoById(id);
+    setTimeout(() => syncing = false, 1000);
+});
+
+socket.on("play", t => {
+    syncing = true;
+    if (Math.abs(player.getCurrentTime() - t) > 1.5) player.seekTo(t, true);
+    player.playVideo();
+    setTimeout(() => syncing = false, 1000);
+});
+
+socket.on("pause", () => {
+    syncing = true;
+    player.pauseVideo();
+    setTimeout(() => syncing = false, 1000);
+});
+
+socket.on("initRoom", d => {
+    if (d.videoId) {
+        syncing = true;
+        player.loadVideoById({ videoId: d.videoId, startSeconds: d.time });
+        if (!d.isPlaying) setTimeout(() => player.pauseVideo(), 500);
+        setTimeout(() => syncing = false, 1500);
+    }
+});
+
+// 5. QUEUE
+socket.on("updateQueue", list => {
+    const qBox = document.getElementById("queue");
+    qBox.innerHTML = list.map((v, i) => `
+        <div class="queue-item">
+            <img src="${v.thumbnail}">
+            <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${v.title}</div>
+            <i class="fas fa-trash" style="color:#ef4444; cursor:pointer" onclick="socket.emit('removeVideo', ${i})"></i>
+        </div>
+    `).join("") || '<div style="text-align:center; margin-top:50px; color:var(--sub)">Trống...</div>';
+});
+
+function skip() { socket.emit("skip"); }
+
+// 6. CHAT & EMOJI
+function send() {
+    let t = document.getElementById("msgInput").value.trim();
+    if (!t) return;
+    const emojiMap = { ":D": "😄", ":)": "🙂", ":(": "😟", ":P": "😛", "<3": "❤️" };
+    Object.keys(emojiMap).forEach(key => t = t.replaceAll(key, emojiMap[key]));
+    socket.emit("chatMessage", { name: myName, message: t });
+    document.getElementById("msgInput").value = "";
+}
+
+socket.on("chatMessage", d => {
+    const div = document.createElement("div");
+    div.className = `msg ${d.name === myName ? 'me' : 'other'}`;
+    div.innerHTML = `<small style="display:block; font-size:0.7rem; opacity:0.8;">${d.name}</small>${d.message}`;
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+});
+
+// 7. THEME
+function toggleTheme() {
+    document.body.classList.toggle('dark-theme');
+    const isDark = document.body.classList.contains('dark-theme');
+    document.getElementById('theme-icon').className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+}
+
+(function() {
+    if (localStorage.getItem('theme') === 'dark') {
+        document.body.classList.add('dark-theme');
+        document.getElementById('theme-icon').className = 'fas fa-sun';
+    }
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.body.appendChild(tag);
+    window.onclick = e => { if (!resultsBox.contains(e.target) && e.target !== searchInput) resultsBox.classList.remove("active"); };
+})();
 const msgInput = document.getElementById("msg");
 const statusText = document.getElementById("statusText");
 
