@@ -2,7 +2,6 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🎵 Music Room Pro</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="/socket.io/socket.io.js"></script>
@@ -11,90 +10,78 @@
             --bg-body: #0f172a; --bg-container: rgba(30, 41, 59, 0.6);
             --text-main: #f1f5f9; --text-sub: #94a3b8; --border-color: #334155;
             --accent-color: #818cf8; --bg-msg-me: #818cf8; --bg-msg-other: #1e293b;
-            --glass-blur: blur(15px); --shadow: 0 10px 40px rgba(0,0,0,0.3);
+            --glass-blur: blur(15px);
         }
         * { box-sizing: border-box; outline: none; }
         body {
-            margin: 0; padding: 20px; font-family: 'Inter', sans-serif;
+            margin: 0; padding: 20px; font-family: sans-serif;
             background: var(--bg-body); color: var(--text-main);
             display: flex; flex-direction: column; align-items: center; min-height: 100vh;
         }
         .container {
             width: 100%; max-width: 1100px; background: var(--bg-container);
             backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
-            padding: 30px; border-radius: 24px; border: 1px solid var(--border-color);
-            box-shadow: var(--shadow); display: grid; grid-template-columns: 1fr 320px; gap: 25px; position: relative;
+            padding: 25px; border-radius: 20px; border: 1px solid var(--border-color);
+            display: grid; grid-template-columns: 1fr 320px; gap: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.3);
         }
-        .player-container { aspect-ratio: 16/9; width: 100%; background: black; border-radius: 16px; overflow: hidden; border: 4px solid var(--border-color); }
-        .online-box { font-size: 0.85em; margin-bottom: 15px; color: var(--text-sub); }
-        .online-dot { height: 8px; width: 8px; background: #10b981; border-radius: 50%; display: inline-block; margin-right: 5px; }
-        .search-area { position: relative; margin-top: 15px; }
-        .search-bar { display: flex; gap: 10px; }
-        input { flex: 1; padding: 12px; border-radius: 12px; border: 1px solid var(--border-color); background: rgba(255,255,255,0.1); color: var(--text-main); }
-        button { padding: 12px 20px; border: none; border-radius: 12px; background: var(--accent-color); color: white; font-weight: bold; cursor: pointer; }
-        .results-box {
-            position: absolute; top: 100%; left: 0; width: 100%; background: var(--bg-container);
-            backdrop-filter: var(--glass-blur); border-radius: 12px; border: 1px solid var(--border-color); z-index: 100; display: none; max-height: 350px; overflow-y: auto;
-        }
+        @media (max-width: 850px) { .container { grid-template-columns: 1fr; } }
+        .player-container { aspect-ratio: 16/9; background: #000; border-radius: 12px; overflow: hidden; border: 2px solid var(--border-color); }
+        #player { width: 100%; height: 100%; }
+        .online-info { font-size: 0.85em; margin-bottom: 10px; color: #10b981; }
+        .search-area { position: relative; }
+        .search-bar { display: flex; gap: 10px; margin: 15px 0; }
+        input { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: #fff; }
+        button { padding: 10px 20px; border: none; border-radius: 10px; background: var(--accent-color); color: #fff; cursor: pointer; font-weight: bold; }
+        .results-box { position: absolute; width: 100%; background: #1e293b; border-radius: 10px; z-index: 100; display: none; max-height: 300px; overflow-y: auto; top: 100%; border: 1px solid var(--border-color); }
         .results-box.active { display: block; }
-        .result-item { display: flex; gap: 12px; padding: 10px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
-        .queue-box, .chat-area { background: rgba(0,0,0,0.1); border-radius: 16px; border: 1px solid var(--border-color); }
-        .queue-box { height: 200px; overflow-y: auto; padding: 15px; }
-        .chat-area { height: 400px; display: flex; flex-direction: column; overflow: hidden; }
-        #chatMsgs { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
-        .msg { max-width: 85%; padding: 8px 12px; border-radius: 14px; font-size: 0.9em; position: relative; }
-        .msg-time { font-size: 0.7em; opacity: 0.5; display: block; margin-top: 4px; }
-        .msg.me { align-self: flex-end; background: var(--bg-msg-me); color: white; border-bottom-right-radius: 4px; }
-        .msg.other { align-self: flex-start; background: var(--bg-msg-other); border-bottom-left-radius: 4px; }
+        .result-item { display: flex; gap: 10px; padding: 10px; cursor: pointer; border-bottom: 1px solid #334155; }
+        .result-item:hover { background: #2d3748; }
+        .result-item img { width: 70px; border-radius: 4px; }
+        .queue-box, .chat-area { background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid var(--border-color); }
+        .queue-box { height: 200px; overflow-y: auto; padding: 10px; margin-bottom: 15px; }
+        .chat-area { height: 380px; display: flex; flex-direction: column; overflow: hidden; }
+        #chatMsgs { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+        .msg { max-width: 85%; padding: 8px 12px; border-radius: 10px; font-size: 0.9em; position: relative; }
+        .msg-time { font-size: 0.7em; opacity: 0.5; margin-left: 8px; }
+        .msg.me { align-self: flex-end; background: var(--bg-msg-me); }
+        .msg.other { align-self: flex-start; background: var(--bg-msg-other); }
         #join { position: fixed; inset: 0; background: #0f172a; z-index: 1000; display: flex; justify-content: center; align-items: center; }
-        .join-box { background: rgba(30, 41, 59, 0.9); padding: 40px; border-radius: 20px; text-align: center; width: 320px; border: 1px solid var(--border-color); }
     </style>
 </head>
-<body class="dark-theme">
-
-<div id="join">
-    <div class="join-box">
-        <h2 style="margin-top:0">🎵 Listen With Me</h2>
-        <input id="uNameInput" placeholder="Nhập tên..." onkeypress="if(event.key==='Enter')handleJoin()" style="width:100%; margin-bottom:15px; text-align:center;">
-        <button onclick="handleJoin()" style="width:100%">Vào phòng</button>
-    </div>
-</div>
-
-<div class="container">
-    <div class="main-content">
-        <h1 style="margin:0; font-size:1.5em">🎵 Music Room Pro</h1>
-        <div class="online-box">
-            <span class="online-dot"></span> Online (<span id="userCount">0</span>): <span id="userList">Đang tải...</span>
+<body>
+    <div id="join">
+        <div style="text-align:center; background:#1e293b; padding:40px; border-radius:15px; border: 1px solid var(--border-color);">
+            <h2>🎵 Music Room Pro</h2>
+            <input id="uNameInp" placeholder="Tên của bạn..." onkeypress="if(event.key==='Enter')app.join()">
+            <button onclick="app.join()">Vào phòng</button>
         </div>
-        
-        <div class="player-container"><div id="player"></div></div>
-        
-        <div class="search-area">
-            <div class="search-bar">
-                <input id="sQueryInput" placeholder="Tìm bài hoặc dán link..." onkeypress="if(event.key==='Enter')handleSearch()">
-                <button onclick="handleSearch()">🔍 Tìm</button>
-                <button onclick="handlePlayNow()" style="background:#10b981">▶ Link</button>
+    </div>
+    <div class="container">
+        <div class="main">
+            <div class="online-info">🟢 Online (<span id="uCount">0</span>): <span id="uList">Đang tải...</span></div>
+            <div class="player-container"><div id="player"></div></div>
+            <div class="search-area">
+                <div class="search-bar">
+                    <input id="sInp" placeholder="Tìm tên bài hoặc dán link..." onkeypress="if(event.key==='Enter')app.search()">
+                    <button onclick="app.search()">Tìm bài</button>
+                    <button onclick="app.playLink()" style="background:#10b981">Phát Link</button>
+                </div>
+                <div id="results" class="results-box"></div>
             </div>
-            <div id="results" class="results-box"></div>
+            <button onclick="app.skip()" style="width:100%; background:#ef4444; margin-top:5px">⏭ Skip bài</button>
         </div>
-
-        <button onclick="handleSkip()" style="width:100%; background:#ef4444; margin-top:15px">⏭ Skip bài</button>
-    </div>
-
-    <div class="sidebar-content">
-        <h3 style="margin:0; font-size:1em; color:var(--accent-color)">📜 HÀNG ĐỢI</h3>
-        <div id="queue" class="queue-box"></div>
-        
-        <div class="chat-area">
-            <div id="chatMsgs"></div>
-            <div style="display:flex; gap:5px; padding:10px; border-top:1px solid var(--border-color)">
-                <input id="mInput" placeholder="Chat..." onkeypress="if(event.key==='Enter')handleSend()" style="flex:1">
-                <button onclick="handleSend()">Gửi</button>
+        <div class="sidebar">
+            <h3 style="margin: 0 0 10px 0; font-size: 1em;">📜 Hàng đợi</h3>
+            <div id="qBox" class="queue-box"></div>
+            <div class="chat-area">
+                <div id="chatMsgs"></div>
+                <div style="display:flex; gap:5px; padding:10px; border-top:1px solid var(--border-color)">
+                    <input id="mInp" placeholder="Chat..." onkeypress="if(event.key==='Enter')app.send()">
+                    <button onclick="app.send()">Gửi</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
-
-<script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
