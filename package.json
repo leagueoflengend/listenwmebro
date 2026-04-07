@@ -1,7 +1,6 @@
 {
   "name": "listen-with-me",
   "version": "1.0.0",
-  "description": "Web nghe nhạc chung real-time",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
