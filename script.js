@@ -1,12 +1,16 @@
 const socket = io();
 const statusText = document.getElementById('statusText');
 const playlistUI = document.getElementById('playlistUI');
+const youtubeLinkInput = document.getElementById('youtubeLink');
+const searchResultsBox = document.getElementById('searchResultsBox');
+const userCountElem = document.getElementById('userCount');
+
 let player; 
 let isSyncing = false; 
-let syncTimeout; 
 let currentVideoId = ''; 
-let initialRoomState = null; 
+let syncTimeout;
 
+// 1. KHỞI TẠO YOUTUBE PLAYER
 var tag = document.createElement('script');
 tag.src = "https://www.youtube.com/iframe_api";
 var firstScriptTag = document.getElementsByTagName('script')[0];
@@ -17,7 +21,7 @@ function onYouTubeIframeAPIReady() {
         height: '360',
         width: '640',
         videoId: 'y881t8SK8tE', 
-        playerVars: { 'playsinline': 1, 'autoplay': 0, 'controls': 1 },
+        playerVars: { 'playsinline': 1, 'autoplay': 1, 'controls': 1 },
         events: {
             'onReady': onPlayerReady,
             'onStateChange': onPlayerStateChange
@@ -26,191 +30,203 @@ function onYouTubeIframeAPIReady() {
 }
 
 function onPlayerReady(event) {
-    if (initialRoomState) {
-        applyRoomState(initialRoomState);
-    } else {
-        statusText.innerText = "Trạng thái: Sẵn sàng.";
-    }
+    statusText.innerText = "Trạng thái: Sẵn sàng.";
 }
 
-function applyRoomState(state) {
-    isSyncing = true;
-    clearTimeout(syncTimeout);
-    
-    currentVideoId = state.videoId;
-    
-    if (state.isPlaying) {
-        player.loadVideoById(state.videoId, state.time);
-        statusText.innerText = "Trạng thái: Đã đồng bộ vào phòng trực tiếp.";
-    } else {
-        player.cueVideoById(state.videoId, state.time);
-        statusText.innerText = "Trạng thái: Đồng bộ phòng (Đang tạm dừng).";
-    }
-    syncTimeout = setTimeout(() => isSyncing = false, 1500);
-}
+// 2. ĐỒNG BỘ TỪ SERVER (LISTENERS)
 
-socket.on('initRoom', (state) => {
-    initialRoomState = state;
-    if (player && player.loadVideoById) {
-        applyRoomState(state);
-    }
+// Cập nhật số người online
+socket.on('updateUserCount', (count) => {
+    if (userCountElem) userCountElem.innerText = count;
 });
 
-function getValidId() {
-    const linkInput = document.getElementById('youtubeLink').value;
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = linkInput.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-}
+// Khởi tạo phòng khi mới vào
+socket.on('initRoom', (state) => {
+    isSyncing = true;
+    currentVideoId = state.videoId;
+    
+    // Đợi player sẵn sàng mới load
+    const checkReady = setInterval(() => {
+        if (player && player.loadVideoById) {
+            clearInterval(checkReady);
+            if (state.isPlaying) {
+                player.loadVideoById(state.videoId, state.time);
+            } else {
+                player.cueVideoById(state.videoId, state.time);
+            }
+            setTimeout(() => isSyncing = false, 1500);
+        }
+    }, 500);
+});
 
-function playNow() {
-    const videoId = getValidId();
-    if (videoId) { socket.emit('changeVideo', videoId); document.getElementById('youtubeLink').value = ''; } 
-    else alert("Link không hợp lệ!");
-}
+socket.on('changeVideo', (videoId) => {
+    if (currentVideoId === videoId) return;
+    currentVideoId = videoId;
+    isSyncing = true;
+    player.loadVideoById(videoId);
+    statusText.innerText = "Trạng thái: Đang chuyển bài mới...";
+    setTimeout(() => isSyncing = false, 2000);
+});
 
-function addToList() {
-    const videoId = getValidId();
-    if (videoId) { 
-        socket.emit('addToList', videoId); 
-        document.getElementById('youtubeLink').value = ''; 
-        statusText.innerText = "Trạng thái: Đang tải bài hát vào hàng đợi..."; 
-    } 
-    else alert("Link không hợp lệ!");
-}
-
-let isSkipping = false;
-function skipVideo() { 
-    if (isSkipping) return; 
-    isSkipping = true;
-    socket.emit('skipVideo'); 
-    statusText.innerText = "Trạng thái: Đang chuyển bài...";
-    setTimeout(() => isSkipping = false, 2000); 
-}
-
-let isAudioOnly = false;
-function toggleVideoMode() {
-    const container = document.getElementById('youtubePlayerContainer');
-    const btn = document.getElementById('toggleBtn');
-    isAudioOnly = !isAudioOnly;
-    if (isAudioOnly) {
-        container.classList.add('audio-only-mode');
-        btn.innerText = "📺 Chế độ: Chỉ nghe Nhạc";
-        btn.style.backgroundColor = "#9ece6a";
-    } else {
-        container.classList.remove('audio-only-mode');
-        btn.innerText = "🎧 Chế độ: Đang xem Video";
-        btn.style.backgroundColor = "#7aa2f7";
+socket.on('play', (time) => {
+    isSyncing = true;
+    if (Math.abs(player.getCurrentTime() - time) > 1.5) {
+        player.seekTo(time, true);
     }
-}
+    player.playVideo();
+    statusText.innerText = "Trạng thái: Đang phát.";
+    setTimeout(() => isSyncing = false, 1000);
+});
 
+socket.on('pause', () => {
+    isSyncing = true;
+    player.pauseVideo();
+    statusText.innerText = "Trạng thái: Tạm dừng.";
+    setTimeout(() => isSyncing = false, 1000);
+});
+
+// 3. XỬ LÝ SỰ KIỆN TRÌNH PHÁT (EMITS)
 function onPlayerStateChange(event) {
-    if (isSyncing) return; 
+    if (isSyncing) return; // Không gửi lệnh lên server nếu đang được đồng bộ xuống
+
     if (event.data == YT.PlayerState.PLAYING) {
         socket.emit('play', player.getCurrentTime());
     } else if (event.data == YT.PlayerState.PAUSED) {
         socket.emit('pause', player.getCurrentTime());
     } else if (event.data == YT.PlayerState.ENDED) {
-        skipVideo(); 
+        socket.emit('skipVideo'); // Hết bài tự chuyển
     }
 }
 
-socket.on('changeVideo', (videoId) => {
-    if (currentVideoId === videoId) return; 
-    currentVideoId = videoId;
+// 4. TÌM KIẾM NHẠC (GOOGLE API)
+function searchSong() {
+    const query = youtubeLinkInput.value.trim();
+    if (!query) return;
 
-    isSyncing = true;
-    clearTimeout(syncTimeout);
-    
-    player.loadVideoById(videoId);
-    statusText.innerText = `Trạng thái: Đang tải bài mới...`;
-    
-    syncTimeout = setTimeout(() => {
-        isSyncing = false;
-        statusText.innerText = `Trạng thái: Đang phát.`;
-    }, 2500); 
+    // Nếu là link thì không tìm kiếm, nhắc người dùng dùng nút Phát Link
+    if (getValidId()) {
+        return alert("Đây là link YouTube, hãy dùng nút 'Phát Link' hoặc '+ Hàng Đợi'!");
+    }
+
+    searchResultsBox.style.display = 'block';
+    searchResultsBox.innerHTML = '<div style="padding:20px; text-align:center;">Đang tìm kiếm...</div>';
+    socket.emit('searchSong', query);
+}
+
+socket.on('searchResults', (results) => {
+    searchResultsBox.innerHTML = '';
+    if (results.length === 0) {
+        searchResultsBox.innerHTML = '<div style="padding:15px;">Không tìm thấy bài nào!</div>';
+        return;
+    }
+
+    results.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'search-item';
+        div.innerHTML = `
+            <img src="${item.thumbnail}" alt="thumb">
+            <div class="search-info">
+                <div class="search-title">${item.title}</div>
+                <div class="search-meta"><span>${item.duration}</span> • ${item.author}</div>
+                <div class="search-actions">
+                    <button onclick="playFromSearch('${item.id}')">▶ Phát Ngay</button>
+                    <button class="btn-secondary" onclick="addFromSearch('${item.id}')">+ Hàng Đợi</button>
+                </div>
+            </div>
+        `;
+        searchResultsBox.appendChild(div);
+    });
 });
 
-// ==========================================
-// ĐÃ SỬA: Tích hợp Nút bấm vào Danh sách phát
-// ==========================================
+function playFromSearch(id) {
+    socket.emit('changeVideo', id);
+    closeSearch();
+}
+
+function addFromSearch(id) {
+    socket.emit('addToList', id);
+    statusText.innerText = "Trạng thái: Đã thêm vào hàng đợi.";
+    closeSearch();
+}
+
+function closeSearch() {
+    searchResultsBox.style.display = 'none';
+    youtubeLinkInput.value = '';
+}
+
+// 5. QUẢN LÝ PLAYLIST
 socket.on('updatePlaylist', (playlist) => {
-    playlistUI.innerHTML = ''; 
+    playlistUI.innerHTML = '';
     if (playlist.length === 0) {
-        playlistUI.innerHTML = '<li style="padding: 10px;">Danh sách đang trống...</li>'; return;
+        playlistUI.innerHTML = '<li>Danh sách đang trống...</li>';
+        return;
     }
     playlist.forEach((item, index) => {
         const li = document.createElement('li');
         li.className = 'playlist-item';
-        
-        // Tên bài hát
-        const titleSpan = document.createElement('span');
-        titleSpan.className = 'playlist-item-title';
-        titleSpan.innerText = `${index + 1}. 🎵 ${item.title}`;
-        
-        // Cụm chứa 2 nút bấm
-        const actionsDiv = document.createElement('div');
-        actionsDiv.className = 'playlist-actions';
-        
-        // Chỉ hiện nút "Ưu tiên" nếu không phải bài đầu tiên
-        if (index > 0) {
-            const upBtn = document.createElement('button');
-            upBtn.className = 'btn-up';
-            upBtn.innerText = '⬆️ Ưu tiên';
-            upBtn.onclick = () => socket.emit('moveVideoToTop', index); // Bấm phát là đẩy số index lên server
-            actionsDiv.appendChild(upBtn);
-        }
-        
-        // Nút Xóa (bài nào cũng có)
-        const delBtn = document.createElement('button');
-        delBtn.className = 'btn-del';
-        delBtn.innerText = '❌ Xóa';
-        delBtn.onclick = () => socket.emit('removeVideo', index);
-        actionsDiv.appendChild(delBtn);
-        
-        li.appendChild(titleSpan);
-        li.appendChild(actionsDiv);
+        li.innerHTML = `
+            <span class="playlist-item-title">${index + 1}. 🎵 ${item.title}</span>
+            <div class="playlist-actions">
+                ${index > 0 ? `<button class="btn-up" onclick="socket.emit('moveVideoToTop', ${index})">⬆️ Ưu tiên</button>` : ''}
+                <button class="btn-del" onclick="socket.emit('removeVideo', ${index})">❌ Xóa</button>
+            </div>
+        `;
         playlistUI.appendChild(li);
     });
 });
-// ==========================================
 
-socket.on('play', (time) => {
-    isSyncing = true;
-    clearTimeout(syncTimeout);
-    if (Math.abs(player.getCurrentTime() - time) > 1.0) player.seekTo(time, true);
-    player.playVideo();
-    syncTimeout = setTimeout(() => isSyncing = false, 1500);
-});
+// 6. CÁC HÀM HỖ TRỢ KHÁC
+function getValidId() {
+    const input = youtubeLinkInput.value;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = input.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+}
 
-socket.on('pause', () => {
-    isSyncing = true;
-    clearTimeout(syncTimeout);
-    player.pauseVideo();
-    syncTimeout = setTimeout(() => isSyncing = false, 1500);
-});
+function playNow() {
+    const id = getValidId();
+    if (id) { socket.emit('changeVideo', id); youtubeLinkInput.value = ''; }
+}
 
-function sendMessage() {
-    const nicknameInput = document.getElementById('nickname').value.trim();
-    const chatInput = document.getElementById('chatInput');
-    const message = chatInput.value.trim();
-    const finalName = nicknameInput === "" ? "Khách Ẩn Danh" : nicknameInput;
+function addToList() {
+    const id = getValidId();
+    if (id) { socket.emit('addToList', id); youtubeLinkInput.value = ''; }
+}
 
-    if (message !== "") {
-        socket.emit('chatMessage', { name: finalName, message: message });
-        chatInput.value = ''; 
+function skipVideo() {
+    socket.emit('skipVideo');
+}
+
+function toggleVideoMode() {
+    const container = document.getElementById('youtubePlayerContainer');
+    const btn = document.getElementById('toggleBtn');
+    if (container.classList.contains('audio-only-mode')) {
+        container.classList.remove('audio-only-mode');
+        btn.innerText = "🎧 Chế độ: Đang xem Video";
+        btn.style.backgroundColor = "#7aa2f7";
+    } else {
+        container.classList.add('audio-only-mode');
+        btn.innerText = "📺 Chế độ: Chỉ nghe Nhạc";
+        btn.style.backgroundColor = "#9ece6a";
     }
 }
 
-function handleKeyPress(event) {
-    if (event.key === 'Enter') sendMessage();
+// 7. CHATBOX
+function sendMessage() {
+    const name = document.getElementById('nickname').value || "Khách";
+    const input = document.getElementById('chatInput');
+    if (input.value.trim()) {
+        socket.emit('chatMessage', { name, message: input.value });
+        input.value = '';
+    }
 }
 
+function handleKeyPress(e) { if (e.key === 'Enter') sendMessage(); }
+
 socket.on('chatMessage', (data) => {
-    const chatMessages = document.getElementById('chatMessages');
-    const msgElement = document.createElement('div');
-    msgElement.classList.add('chat-msg');
-    msgElement.innerHTML = `<strong>${data.name}:</strong> ${data.message}`;
-    chatMessages.appendChild(msgElement);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    const chat = document.getElementById('chatMessages');
+    const div = document.createElement('div');
+    div.innerHTML = `<strong>${data.name}:</strong> ${data.message}`;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
 });
