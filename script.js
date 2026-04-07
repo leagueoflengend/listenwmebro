@@ -1,3 +1,4 @@
+// ================= SOCKET =================
 const socket = io();
 
 let myName = "";
@@ -6,19 +7,28 @@ let playerReady = false;
 let pendingInit = null;
 let isSyncing = false;
 
+// ================= EMOJI =================
+function convertEmoji(text) {
+    return text
+        .replace(/:\)\)/g, "😂")
+        .replace(/:D/g, "😄")
+        .replace(/:\)/g, "🙂")
+        .replace(/:\(/g, "🙁")
+        .replace(/:v/g, "😆")
+        .replace(/<3/g, "❤️")
+        .replace(/:o/g, "😮")
+        .replace(/;\)/g, "😉");
+}
+
 // ================= JOIN =================
 function joinRoom() {
     const input = document.getElementById("joinNameInput");
     const name = input.value.trim();
 
-    if (!name) {
-        alert("Nhập tên đi bro 😅");
-        return;
-    }
+    if (!name) return alert("Nhập tên đi bro 😅");
 
     myName = name;
-
-    socket.emit("join", name); // 🔥 QUAN TRỌNG
+    socket.emit("join", name);
 
     document.getElementById("joinModal").style.display = "none";
 }
@@ -34,7 +44,6 @@ function onYouTubeIframeAPIReady() {
         events: {
             onReady: () => {
                 playerReady = true;
-
                 if (pendingInit) {
                     startRoom(pendingInit);
                     pendingInit = null;
@@ -80,7 +89,6 @@ socket.on("pause", () => {
 
 function startRoom(data) {
     if (!data.videoId) return;
-
     loadVideo(data.videoId, data.time, data.isPlaying);
 }
 
@@ -124,8 +132,11 @@ socket.on("searchResults", (list) => {
     list.forEach(v => {
         const div = document.createElement("div");
         div.className = "search-item";
-        div.innerHTML = `<img src="${v.thumbnail}" width="80">
-            <div><b>${v.title}</b></div>`;
+
+        div.innerHTML = `
+            <img src="${v.thumbnail}" width="80">
+            <div><b>${v.title}</b></div>
+        `;
 
         div.onclick = () => {
             socket.emit("addToList", v.id);
@@ -139,24 +150,43 @@ socket.on("searchResults", (list) => {
 // ================= CHAT =================
 function sendMessage() {
     const input = document.getElementById("chatInput");
-    const msg = input.value.trim();
+    let msg = input.value.trim();
     if (!msg) return;
 
-    socket.emit("chatMessage", { name: myName, message: msg });
+    msg = convertEmoji(msg); // 🔥 convert trước khi gửi
+
+    socket.emit("chatMessage", {
+        name: myName,
+        message: msg
+    });
+
     input.value = "";
 }
 
 socket.on("chatMessage", (d) => {
     const box = document.getElementById("chatMessages");
 
+    const time = new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
+    });
+
     const div = document.createElement("div");
-    div.innerHTML = `<b>${d.name}:</b> ${d.message}`;
+    div.className = "chat-item";
+
+    div.innerHTML = `
+        <div class="chat-header">
+            <span class="chat-name">${d.name}</span>
+            <span class="chat-time">${time}</span>
+        </div>
+        <div class="chat-text">${d.message}</div>
+    `;
 
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
 });
 
-// ================= YOUTUBE LOAD =================
+// ================= LOAD YOUTUBE API =================
 const tag = document.createElement("script");
 tag.src = "https://www.youtube.com/iframe_api";
 document.body.appendChild(tag);
