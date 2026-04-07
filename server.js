@@ -18,7 +18,6 @@ app.use(express.static(__dirname));
 let users = {};
 let playlist = [];
 
-// 🔥 trạng thái phòng
 let roomState = {
     videoId: null,
     time: 0,
@@ -26,91 +25,122 @@ let roomState = {
     lastUpdate: Date.now()
 };
 
-function getCurrentTime() {
-    if (!roomState.isPlaying) return roomState.time;
-    return roomState.time + (Date.now() - roomState.lastUpdate) / 1000;
+function getTime(){
+    if(!roomState.isPlaying) return roomState.time;
+    return roomState.time + (Date.now()-roomState.lastUpdate)/1000;
 }
 
-io.on('connection', (socket) => {
+// ===== PLAY NEXT =====
+function playNext(){
+    if(playlist.length===0){
+        roomState.videoId=null;
+        return;
+    }
 
-    socket.on('join', (name) => {
-        users[socket.id] = name || "Khách";
-        io.emit('updateUserList', Object.values(users));
+    const next=playlist.shift();
 
-        // 🔥 gửi trạng thái thật
-        socket.emit('initRoom', {
-            videoId: roomState.videoId,
-            time: getCurrentTime(),
-            isPlaying: roomState.isPlaying
+    roomState={
+        videoId: next.id,
+        time:0,
+        isPlaying:true,
+        lastUpdate:Date.now()
+    };
+
+    io.emit("changeVideo", next.id);
+    io.emit("updateQueue", playlist);
+}
+
+// ===== SOCKET =====
+io.on('connection', socket=>{
+
+    socket.on("join", name=>{
+        users[socket.id]=name || "Khách";
+
+        socket.emit("initRoom",{
+            videoId:roomState.videoId,
+            time:getTime(),
+            isPlaying:roomState.isPlaying
         });
+
+        socket.emit("updateQueue", playlist);
+        io.emit("users", Object.values(users));
     });
 
-    // ===== CHAT FIX =====
-    socket.on('chatMessage', (data) => {
-        io.emit('chatMessage', data);
+    // ===== CHAT =====
+    socket.on("chatMessage", d=>{
+        io.emit("chatMessage", d);
     });
 
     // ===== SEARCH =====
-    socket.on('searchSong', async (q) => {
-        try {
-            const res = await youtube.search.list({
-                part: 'snippet',
+    socket.on("searchSong", async q=>{
+        try{
+            const res=await youtube.search.list({
+                part:'snippet',
                 q,
-                maxResults: 5,
-                type: 'video'
+                maxResults:5,
+                type:'video'
             });
 
-            const ids = res.data.items.map(i => i.id.videoId).join(',');
-
-            const vRes = await youtube.videos.list({
-                part: 'contentDetails,snippet',
-                id: ids
-            });
-
-            const results = vRes.data.items.map(v => ({
-                id: v.id,
-                title: v.snippet.title,
-                thumbnail: v.snippet.thumbnails.medium.url
+            const results=res.data.items.map(v=>({
+                id:v.id.videoId,
+                title:v.snippet.title,
+                thumbnail:v.snippet.thumbnails.medium.url
             }));
 
-            socket.emit('searchResults', results);
-        } catch (e) {
+            socket.emit("searchResults", results);
+        }catch(e){
             console.log(e);
         }
     });
 
-    // ===== CHANGE VIDEO =====
-    socket.on('changeVideo', (id) => {
-        roomState = {
-            videoId: id,
-            time: 0,
-            isPlaying: true,
-            lastUpdate: Date.now()
-        };
+    // ===== ADD QUEUE =====
+    socket.on("addToQueue", item=>{
 
-        io.emit('changeVideo', id);
+        // tránh trùng
+        if(roomState.videoId===item.id) return;
+        if(playlist.find(v=>v.id===item.id)) return;
+
+        if(!roomState.videoId){
+            roomState={
+                videoId:item.id,
+                time:0,
+                isPlaying:true,
+                lastUpdate:Date.now()
+            };
+
+            io.emit("changeVideo", item.id);
+        }else{
+            playlist.push(item);
+            io.emit("updateQueue", playlist);
+        }
     });
 
-    // ===== PLAY =====
-    socket.on('play', (t) => {
-        roomState.time = t;
-        roomState.isPlaying = true;
-        roomState.lastUpdate = Date.now();
-
-        socket.broadcast.emit('play', t);
+    // ===== SKIP =====
+    socket.on("skip", ()=>{
+        playNext();
     });
 
-    // ===== PAUSE =====
-    socket.on('pause', (t) => {
-        roomState.time = t;
-        roomState.isPlaying = false;
-
-        socket.broadcast.emit('pause', t);
+    // ===== SYNC =====
+    socket.on("play", t=>{
+        roomState.time=t;
+        roomState.isPlaying=true;
+        roomState.lastUpdate=Date.now();
+        socket.broadcast.emit("play", t);
     });
 
-    socket.on('disconnect', () => {
+    socket.on("pause", t=>{
+        roomState.time=t;
+        roomState.isPlaying=false;
+        socket.broadcast.emit("pause", t);
+    });
+
+    socket.on("ended", ()=>{
+        playNext();
+    });
+
+    socket.on("disconnect", ()=>{
         delete users[socket.id];
-        io.emit('updateUserList', Object.values(users));
+        io.emit("users", Object.values(users));
     });
 });
 
