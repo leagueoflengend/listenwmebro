@@ -46,21 +46,29 @@ io.on('connection', (socket) => {
     socket.on('searchSong', async (q) => {
         try {
             const res = await youtube.search.list({ part: 'snippet', q, maxResults: 5, type: 'video' });
-            const ids = res.data.items.map(i => i.id.videoId).join(',');
+            const ids = res.data.items.map(i => i.id.videoId).filter(id => id).join(',');
+            if (!ids) return socket.emit('searchResults', []);
+
             const vRes = await youtube.videos.list({ part: 'contentDetails,snippet', id: ids });
             const results = vRes.data.items.map(v => ({
                 id: v.id, title: v.snippet.title, thumbnail: v.snippet.thumbnails.medium.url,
                 author: v.snippet.channelTitle, duration: formatDuration(v.contentDetails.duration)
             }));
             socket.emit('searchResults', results);
-        } catch (e) { socket.emit('searchResults', []); }
+        } catch (e) {
+            console.error("Lỗi API:", e.message);
+            socket.emit('searchResults', []);
+        }
     });
 
     socket.on('addToList', async (id) => {
         try {
             const res = await youtube.videos.list({ part: 'snippet', id });
-            playlist.push({ id, title: res.data.items[0]?.snippet.title || "Video" });
-            io.emit('updatePlaylist', playlist);
+            const video = res.data.items[0];
+            if (video) {
+                playlist.push({ id, title: video.snippet.title });
+                io.emit('updatePlaylist', playlist);
+            }
         } catch (e) {}
     });
 
@@ -88,4 +96,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => console.log(`Server Live on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server chạy tại port ${PORT}`));
