@@ -6,39 +6,26 @@
     <title>Listen With Me 🎵</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        :root {
-            --bg: #f0f2f5; --card: #ffffff; --text: #1a1b26; --sub: #565f89; --border: #e1e4e8; --accent: #7aa2f7; --inner: #f8f9fa;
-        }
-        body.dark-theme {
-            --bg: #1a1b26; --card: #24283b; --text: #a9b1d6; --sub: #565f89; --border: #414868; --accent: #7aa2f7; --inner: #1f2335;
-        }
+        :root { --bg: #f0f2f5; --card: #ffffff; --text: #1a1b26; --sub: #565f89; --border: #e1e4e8; --accent: #7aa2f7; --inner: #f8f9fa; }
+        body.dark-theme { --bg: #1a1b26; --card: #24283b; --text: #a9b1d6; --sub: #565f89; --border: #414868; --accent: #7aa2f7; --inner: #1f2335; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; transition: 0.3s; }
         .container { background: var(--card); padding: 25px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.1); width: 100%; max-width: 650px; position: relative; text-align: center; }
-        
         #joinModal { position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: flex; align-items: center; justify-content: center; }
-        .modal-content { background: var(--card); padding: 30px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 300px; }
-
-        .theme-switch { position: absolute; top: 15px; right: 15px; cursor: pointer; color: var(--accent); font-size: 1.2em; }
+        .modal-content { background: var(--card); padding: 30px; border-radius: 12px; text-align: center; width: 300px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .theme-switch { position: absolute; top: 15px; right: 15px; cursor: pointer; color: var(--accent); }
         .online-status { font-size: 0.85em; margin-bottom: 15px; color: var(--sub); }
         .dot { height: 8px; width: 8px; background: #9ece6a; border-radius: 50%; display: inline-block; margin-right: 5px; }
-
         .controls { margin: 10px 0; display: flex; gap: 8px; }
         input[type="text"] { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); outline: none; }
         button { padding: 10px 15px; border: none; border-radius: 6px; background: var(--accent); color: white; font-weight: bold; cursor: pointer; }
-        
         .search-results { position: absolute; top: 110px; left: 5%; width: 90%; background: var(--card); border: 1px solid var(--border); border-radius: 8px; z-index: 100; display: none; max-height: 350px; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.2); text-align: left; }
         .search-item { display: flex; gap: 10px; padding: 10px; border-bottom: 1px solid var(--border); }
         .search-item img { width: 80px; border-radius: 4px; }
-        
         #youtubePlayerContainer { margin-top: 15px; aspect-ratio: 16/9; width: 100%; }
         iframe { width: 100%; height: 100%; border-radius: 8px; border: none; }
         .audio-only-mode { display: none !important; }
-
         .playlist-box, .chat-container { margin-top: 15px; background: var(--inner); padding: 15px; border-radius: 8px; text-align: left; }
-        .chat-messages { height: 100px; overflow-y: auto; margin-bottom: 10px; font-size: 0.9em; }
-        
-        .footer { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 15px; }
-        .fb-link { display: inline-flex; align-items: center; gap: 8px; background: #1877f2; color: white !important; text-decoration: none; padding: 8px 15px; border-radius: 20px; font-weight: bold; }
+        .chat-messages { height: 100px; overflow-y: auto; margin-bottom: 10px; font-size: 0.9em; border-bottom: 1px solid var(--border); }
     </style>
 </head>
 <body>
@@ -49,31 +36,27 @@
             <button onclick="joinRoom()" style="width: 100%;">Tham gia ngay</button>
         </div>
     </div>
-
     <div class="container">
         <div class="theme-switch" onclick="toggleTheme()"><i id="theme-icon" class="fas fa-moon"></i></div>
         <h1>🎵 Listen With Me</h1>
         <div class="online-status"><span class="dot"></span> Online (<span id="userCount">0</span>): <span id="userList"></span></div>
-        
         <div class="controls">
-            <input type="text" id="youtubeLink" placeholder="Tìm tên bài hát hoặc dán link...">
+            <input type="text" id="youtubeLink" placeholder="Tìm tên bài hoặc dán link...">
             <button onclick="searchSong()" style="background:#9ece6a; color:#1a1b26;">🔍 Tìm</button>
+            <button onclick="playNow()">Phát Link</button>
         </div>
-
         <div id="searchResultsBox" class="search-results"></div>
         <div id="youtubePlayerContainer"><div id="player"></div></div>
-        <div id="statusText" style="font-size:0.8em; color:var(--sub); margin:5px 0;">Khởi động...</div>
-
+        <div id="statusText" style="font-size:0.8em; color:var(--sub); margin:5px 0;">Đang khởi tạo...</div>
         <div class="controls">
             <button onclick="skipVideo()" style="background:#f7768e; flex:1;">⏭️ Chuyển bài</button>
-            <button onclick="toggleVideoMode()" id="toggleBtn" style="flex:1;">🎧 Chế độ: Video</button>
+            <button onclick="addToList()" style="background:#bb9af7; flex:1;">+ Hàng Đợi</button>
+            <button onclick="toggleVideoMode()" id="toggleBtn">🎧 Chế độ</button>
         </div>
-
         <div class="playlist-box">
             <h4 style="margin:0 0 10px 0;">Danh sách chờ:</h4>
             <ul id="playlistUI" style="list-style:none; padding:0; margin:0;"></ul>
         </div>
-
         <div class="chat-container">
             <div id="chatMessages" class="chat-messages"></div>
             <div class="controls" style="margin:0;">
@@ -81,12 +64,7 @@
                 <button onclick="sendMessage()">Gửi</button>
             </div>
         </div>
-
-        <div class="footer">
-            <a href="https://facebook.com/your-profile" target="_blank" class="fb-link"><i class="fab fa-facebook"></i> Facebook Admin</a>
-        </div>
     </div>
-
     <script src="/socket.io/socket.io.js"></script>
     <script src="script.js"></script>
 </body>
