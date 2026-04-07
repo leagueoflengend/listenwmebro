@@ -1,244 +1,87 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Listen With Me 🎵</title>
-
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-
 <style>
-:root {
-    --bg: #313338;
-    --card: #2b2d31;
-    --inner: #1e1f22;
-    --text: #f2f3f5;
-    --sub: #b5bac1;
-    --accent: #5865f2;
-    --border: #3f4147;
-}
-
-/* ===== BODY ===== */
 body {
     margin: 0;
-    font-family: "Segoe UI", sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    display: flex;
-    justify-content: center;
-    padding: 20px;
+    font-family: 'Segoe UI', sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
 }
 
-/* ===== CONTAINER ===== */
-.container {
-    width: 100%;
-    max-width: 700px;
-    background: var(--card);
+/* LOGIN */
+#joinModal {
+    position: fixed;
+    inset: 0;
+    background: #0f172a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: #1e293b;
+    padding: 30px;
     border-radius: 12px;
-    padding: 20px;
+    width: 320px;
     box-shadow: 0 10px 40px rgba(0,0,0,0.5);
 }
 
-/* ===== TITLE ===== */
-h1 {
-    margin: 0 0 10px;
-    font-size: 1.4em;
+.modal-content input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    background: #0f172a;
+    color: white;
+    margin-bottom: 15px;
 }
 
-/* ===== USER LIST ===== */
-.online-status {
-    font-size: 0.85em;
-    margin-bottom: 10px;
+.modal-content button {
+    width: 100%;
+    padding: 12px;
+    background: #3b82f6;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-weight: bold;
 }
 
-.user-tag {
-    background: var(--accent);
-    padding: 3px 8px;
-    border-radius: 6px;
-    margin-right: 4px;
-    font-size: 0.75em;
+/* MAIN */
+.container {
+    max-width: 700px;
+    margin: auto;
 }
 
-/* ===== INPUT ===== */
 .controls {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     margin-bottom: 10px;
 }
 
 input {
     flex: 1;
     padding: 10px;
-    border-radius: 6px;
+    border-radius: 8px;
     border: none;
-    background: var(--inner);
-    color: var(--text);
+    background: #1e293b;
+    color: white;
 }
 
 button {
-    padding: 10px;
-    border-radius: 6px;
+    background: #3b82f6;
     border: none;
-    background: var(--accent);
+    padding: 10px;
+    border-radius: 8px;
     color: white;
     cursor: pointer;
-    font-weight: bold;
-}
-
-button:hover {
-    opacity: 0.9;
-}
-
-/* ===== PLAYER ===== */
-#youtubePlayerContainer {
-    width: 100%;
-    aspect-ratio: 16/9;
-    margin-top: 10px;
-}
-
-iframe {
-    width: 100%;
-    height: 100%;
-    border-radius: 8px;
-}
-
-/* ===== SEARCH ===== */
-.search-results {
-    position: absolute;
-    top: 110px;
-    left: 5%;
-    width: 90%;
-    background: var(--card);
-    border-radius: 10px;
-    overflow-y: auto;
-    max-height: 300px;
-    display: none;
-    z-index: 10;
 }
 
 .search-item {
     display: flex;
     gap: 10px;
     padding: 10px;
-    border-bottom: 1px solid var(--border);
     cursor: pointer;
 }
 
 .search-item:hover {
-    background: var(--inner);
-}
-
-.search-item img {
-    width: 70px;
-    border-radius: 6px;
-}
-
-/* ===== PLAYLIST ===== */
-.playlist-box {
-    margin-top: 15px;
-    background: var(--inner);
-    border-radius: 10px;
-    padding: 10px;
-}
-
-.playlist-item {
-    display: flex;
-    justify-content: space-between;
-    padding: 6px;
-    font-size: 0.85em;
-    border-bottom: 1px solid var(--border);
-}
-
-/* ===== CHAT ===== */
-.chat-container {
-    margin-top: 15px;
-    background: var(--inner);
-    border-radius: 10px;
-    padding: 10px;
-}
-
-.chat-messages {
-    height: 120px;
-    overflow-y: auto;
-    font-size: 0.85em;
-    margin-bottom: 8px;
-}
-
-.chat-messages div {
-    margin-bottom: 5px;
-}
-
-/* ===== MODAL ===== */
-#joinModal {
-    position: fixed;
-    inset: 0;
-    background: #000000cc;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.modal-content {
-    background: var(--card);
-    padding: 25px;
-    border-radius: 10px;
-    width: 280px;
+    background: #1e293b;
 }
 </style>
-</head>
-
-<body>
-
-<div id="joinModal">
-    <div class="modal-content">
-        <h3>🎵 Join Room</h3>
-        <input type="text" id="joinNameInput" placeholder="Tên của bạn...">
-        <button onclick="joinRoom()" style="width:100%; margin-top:10px;">Vào phòng</button>
-    </div>
-</div>
-
-<div class="container">
-
-<h1>🎧 Listen With Me</h1>
-
-<div class="online-status">
-    Online (<span id="userCount">0</span>):
-    <span id="userList"></span>
-</div>
-
-<div class="controls">
-    <input type="text" id="youtubeLink" placeholder="Tìm bài hoặc dán link...">
-    <button onclick="searchSong()">🔍</button>
-    <button onclick="playNow()">▶</button>
-</div>
-
-<div id="searchResultsBox" class="search-results"></div>
-
-<div id="youtubePlayerContainer">
-    <div id="player"></div>
-</div>
-
-<div class="controls">
-    <button onclick="skipVideo()" style="background:#ed4245;">⏭ Skip</button>
-</div>
-
-<div class="playlist-box">
-    <h4>📜 Playlist</h4>
-    <ul id="playlistUI" style="list-style:none; padding:0;"></ul>
-</div>
-
-<div class="chat-container">
-    <div id="chatMessages" class="chat-messages"></div>
-    <div class="controls">
-        <input type="text" id="chatInput" placeholder="Nhắn tin..." onkeypress="if(event.key==='Enter') sendMessage()">
-        <button onclick="sendMessage()">Gửi</button>
-    </div>
-</div>
-
-</div>
-
-<script src="/socket.io/socket.io.js"></script>
-<script src="script.js"></script>
-
-</body>
-</html>
