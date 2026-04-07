@@ -4,55 +4,124 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>🎵 Room</title>
+<title>🎵</title>
 
 <script src="/socket.io/socket.io.js"></script>
 
 <style>
-body { font-family: system-ui; margin:0; background:#0f172a; color:white; }
+*{box-sizing:border-box}
+body{
+    margin:0;
+    font-family:system-ui;
+    background:#0f172a;
+    color:white;
+}
 
-.container { max-width:700px; margin:auto; padding:20px; }
+/* ===== LOGIN ===== */
+#join{
+    position:fixed;
+    inset:0;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:#0f172a;
+    z-index:999;
+}
 
-.player {
+.join-box{
+    background:#1e293b;
+    padding:30px;
+    border-radius:16px;
+    width:300px;
+    text-align:center;
+}
+
+input{
+    width:100%;
+    padding:10px;
+    border-radius:10px;
+    border:none;
+    margin-top:10px;
+}
+
+button{
+    padding:10px;
+    border:none;
+    border-radius:10px;
+    background:#6366f1;
+    color:white;
+    cursor:pointer;
+}
+
+/* ===== MAIN ===== */
+.container{
+    max-width:900px;
+    margin:auto;
+    padding:20px;
+}
+
+/* PLAYER */
+.player{
     aspect-ratio:16/9;
     background:black;
-    border-radius:12px;
+    border-radius:16px;
     overflow:hidden;
 }
 
-#player { width:100%; height:100%; }
+#player{width:100%;height:100%}
 
-.controls { display:flex; gap:10px; margin-top:10px; }
-
-input { flex:1; padding:10px; border-radius:8px; border:none; }
-
-button { padding:10px; border:none; border-radius:8px; background:#6366f1; color:white; }
-
-.chat {
-    margin-top:20px;
-    background:#1e293b;
-    border-radius:10px;
-    height:250px;
+/* SEARCH */
+.search{
     display:flex;
-    flex-direction:column;
+    gap:10px;
+    margin-top:15px;
 }
 
-.chat-box {
+.results{
+    margin-top:10px;
+}
+
+.result{
+    display:flex;
+    gap:10px;
+    padding:8px;
+    border-radius:10px;
+    cursor:pointer;
+}
+
+.result:hover{background:#1e293b}
+
+.result img{
+    width:100px;
+    border-radius:8px;
+}
+
+/* CHAT */
+.chat{
+    margin-top:20px;
+    background:#1e293b;
+    border-radius:16px;
+    display:flex;
+    flex-direction:column;
+    height:300px;
+}
+
+.chat-box{
     flex:1;
     overflow:auto;
     padding:10px;
 }
 
-.msg {
-    margin-bottom:10px;
-    padding:8px;
-    border-radius:8px;
+.msg{
     background:#334155;
+    padding:8px;
+    border-radius:10px;
+    margin-bottom:10px;
 }
 
-.me { background:#6366f1; }
+.me{background:#6366f1}
 
-.chat-input {
+.chat-input{
     display:flex;
     gap:10px;
     padding:10px;
@@ -62,26 +131,30 @@ button { padding:10px; border:none; border-radius:8px; background:#6366f1; color
 
 <body>
 
+<!-- LOGIN -->
 <div id="join">
-    <input id="name" placeholder="Tên...">
-    <button onclick="join()">Vào</button>
+    <div class="join-box">
+        <h2>🎵 Dô!!</h2>
+        <input id="name" placeholder="Tên...">
+        <button onclick="join()">Vào</button>
+    </div>
 </div>
 
 <div class="container">
 
 <div class="player"><div id="player"></div></div>
 
-<div class="controls">
-    <input id="search" placeholder="Tìm bài">
+<div class="search">
+    <input id="search" placeholder="Tìm bài...">
     <button onclick="search()">🔍</button>
 </div>
 
-<div id="results"></div>
+<div id="results" class="results"></div>
 
 <div class="chat">
     <div id="chat" class="chat-box"></div>
     <div class="chat-input">
-        <input id="msg" onkeypress="if(event.key==='Enter') send()">
+        <input id="msg" placeholder="Nhắn tin..." onkeypress="if(event.key==='Enter') send()">
         <button onclick="send()">Gửi</button>
     </div>
 </div>
