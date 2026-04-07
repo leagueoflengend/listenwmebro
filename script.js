@@ -1,26 +1,12 @@
 const socket = io();
-
-// --- KHAI BÁO CÁC BIẾN DOM ---
-const joinOverlay = document.getElementById("join");
-const nameInput = document.getElementById("name");
-const searchInput = document.getElementById("search");
-const resultsBox = document.getElementById("results");
-const queueBox = document.getElementById("queue");
-const chatBox = document.getElementById("chatMessages");const socket = io();
-
-const searchInput = document.getElementById("searchInputField");
-const resultsBox = document.getElementById("results");
-const chatMessages = document.getElementById("chatMessages");
-const statusText = document.getElementById("statusText");
-
 let myName = "";
 let player;
 let syncing = false;
 
 // 1. JOIN
-function joinRoom() {
-    myName = document.getElementById("userNameInput").value.trim();
-    if (!myName) return alert("Vui lòng nhập tên!");
+function handleJoin() {
+    myName = document.getElementById("userName").value.trim();
+    if (!myName) return;
     socket.emit("join", myName);
     document.getElementById("join").style.display = "none";
 }
@@ -40,47 +26,40 @@ function onYouTubeIframeAPIReady() {
     });
 }
 
-// 3. SEARCH & PLAY
-function searchSong() {
-    const q = searchInput.value.trim();
+// 3. SEARCH
+function handleSearch() {
+    const q = document.getElementById("searchInp").value.trim();
     if (!q) return;
-    resultsBox.classList.add("active");
-    resultsBox.innerHTML = '<div style="padding:15px; text-align:center;">🔍 Đang tìm...</div>';
+    document.getElementById("results").innerHTML = "<p style='padding:10px'>Đang tìm...</p>";
     socket.emit("searchSong", q);
 }
 
 socket.on("searchResults", list => {
-    resultsBox.innerHTML = "";
-    if (list.length === 0) return resultsBox.innerHTML = '<div style="padding:15px;">Không thấy kết quả</div>';
-    list.forEach(v => {
-        const d = document.createElement("div");
-        d.className = "result-item";
-        d.innerHTML = `<img src="${v.thumbnail}"><div><b>${v.title}</b><br><small>${v.duration || ''}</small></div>`;
-        d.onclick = () => {
-            socket.emit("addToQueue", v);
-            resultsBox.classList.remove("active");
-            searchInput.value = "";
-        };
-        resultsBox.appendChild(d);
-    });
+    const box = document.getElementById("results");
+    box.innerHTML = list.map(v => `
+        <div class="res-item" onclick="addToQueue('${v.id}','${v.title.replace(/'/g, "")}','${v.thumbnail}')">
+            <img src="${v.thumbnail}" width="60">
+            <div style="font-size:0.8rem">${v.title}</div>
+        </div>
+    `).join("");
 });
 
-function playNow() {
-    const q = searchInput.value.trim();
-    const id = getYTId(q);
-    if (id) {
-        socket.emit("changeVideo", id);
-        searchInput.value = "";
-    } else { alert("Dán link YouTube chuẩn vào ô tìm kiếm bạn ơi!"); }
+function addToQueue(id, title, thumbnail) {
+    socket.emit("addToQueue", { id, title, thumbnail });
+    document.getElementById("results").innerHTML = "";
+    document.getElementById("searchInp").value = "";
 }
 
-function getYTId(url) {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-}
+// 4. SYNC LOGIC
+socket.on("initRoom", d => {
+    if (d.videoId) {
+        syncing = true;
+        player.loadVideoById({ videoId: d.videoId, startSeconds: d.time });
+        if (!d.isPlaying) setTimeout(() => player.pauseVideo(), 500);
+        setTimeout(() => syncing = false, 1500);
+    }
+});
 
-// 4. SYNC
 socket.on("changeVideo", id => {
     syncing = true;
     player.loadVideoById(id);
@@ -100,254 +79,34 @@ socket.on("pause", () => {
     setTimeout(() => syncing = false, 1000);
 });
 
-socket.on("initRoom", d => {
-    if (d.videoId) {
-        syncing = true;
-        player.loadVideoById({ videoId: d.videoId, startSeconds: d.time });
-        if (!d.isPlaying) setTimeout(() => player.pauseVideo(), 500);
-        setTimeout(() => syncing = false, 1500);
-    }
-});
-
-// 5. QUEUE
+// 5. QUEUE & CHAT
 socket.on("updateQueue", list => {
-    const qBox = document.getElementById("queue");
-    qBox.innerHTML = list.map((v, i) => `
-        <div class="queue-item">
-            <img src="${v.thumbnail}">
-            <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${v.title}</div>
-            <i class="fas fa-trash" style="color:#ef4444; cursor:pointer" onclick="socket.emit('removeVideo', ${i})"></i>
+    document.getElementById("queueBox").innerHTML = list.map(v => `
+        <div style="display:flex; gap:10px; margin:5px 0; font-size:0.8rem">
+            <img src="${v.thumbnail}" width="40"> <span>${v.title}</span>
         </div>
-    `).join("") || '<div style="text-align:center; margin-top:50px; color:var(--sub)">Trống...</div>';
+    `).join("");
 });
 
-function skip() { socket.emit("skip"); }
+function handleSkip() { socket.emit("skip"); }
 
-// 6. CHAT & EMOJI
-function send() {
-    let t = document.getElementById("msgInput").value.trim();
-    if (!t) return;
-    const emojiMap = { ":D": "😄", ":)": "🙂", ":(": "😟", ":P": "😛", "<3": "❤️" };
-    Object.keys(emojiMap).forEach(key => t = t.replaceAll(key, emojiMap[key]));
-    socket.emit("chatMessage", { name: myName, message: t });
-    document.getElementById("msgInput").value = "";
+function handleSend() {
+    let m = document.getElementById("msgInp").value.trim();
+    if (!m) return;
+    const emojiMap = { ":D": "😄", ":)": "🙂", "<3": "❤️" };
+    Object.keys(emojiMap).forEach(k => m = m.replaceAll(k, emojiMap[k]));
+    socket.emit("chatMessage", { name: myName, message: m });
+    document.getElementById("msgInp").value = "";
 }
 
 socket.on("chatMessage", d => {
     const div = document.createElement("div");
-    div.className = `msg ${d.name === myName ? 'me' : 'other'}`;
-    div.innerHTML = `<small style="display:block; font-size:0.7rem; opacity:0.8;">${d.name}</small>${d.message}`;
-    chatMessages.appendChild(div);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    div.innerHTML = `<b>${d.name}:</b> ${d.message}`;
+    document.getElementById("chatMsgs").appendChild(div);
+    document.getElementById("chatMsgs").scrollTop = document.getElementById("chatMsgs").scrollHeight;
 });
 
-// 7. THEME
-function toggleTheme() {
-    document.body.classList.toggle('dark-theme');
-    const isDark = document.body.classList.contains('dark-theme');
-    document.getElementById('theme-icon').className = isDark ? 'fas fa-sun' : 'fas fa-moon';
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-}
-
-(function() {
-    if (localStorage.getItem('theme') === 'dark') {
-        document.body.classList.add('dark-theme');
-        document.getElementById('theme-icon').className = 'fas fa-sun';
-    }
-    const tag = document.createElement("script");
-    tag.src = "https://www.youtube.com/iframe_api";
-    document.body.appendChild(tag);
-    window.onclick = e => { if (!resultsBox.contains(e.target) && e.target !== searchInput) resultsBox.classList.remove("active"); };
-})();
-const msgInput = document.getElementById("msg");
-const statusText = document.getElementById("statusText");
-
-let myName = "";
-let player;
-let syncing = false;
-
-// --- 1. HÀM GIA NHẬP PHÒNG ---
-function join() {
-    myName = nameInput.value.trim();
-    if (!myName) {
-        alert("Vui lòng nhập tên!");
-        return;
-    }
-    socket.emit("join", myName);
-    joinOverlay.classList.add("fade-out"); // Hiệu ứng biến mất mượt mà
-    setTimeout(() => joinOverlay.style.display = "none", 500);
-}
-
-// --- 2. CẤU HÌNH YOUTUBE PLAYER ---
-function onYouTubeIframeAPIReady() {
-    player = new YT.Player("player", {
-        height: '100%',
-        width: '100%',
-        videoId: 'y881t8SK8tE', // Video mặc định
-        playerVars: { 'playsinline': 1, 'autoplay': 1, 'controls': 1 },
-        events: {
-            onReady: () => statusText.innerText = "Sẵn sàng!",
-            onStateChange: e => {
-                if (syncing) return;
-                // 1: Đang phát, 2: Tạm dừng, 0: Kết thúc
-                if (e.data === 1) socket.emit("play", player.getCurrentTime());
-                if (e.data === 2) socket.emit("pause", player.getCurrentTime());
-                if (e.data === 0) socket.emit("skip");
-            }
-        }
-    });
-}
-
-// --- 3. ĐỒNG BỘ HÓA (SOCKET LISTENERS) ---
-socket.on("initRoom", d => {
-    if (d.videoId) loadVideo(d.videoId, d.time, d.isPlaying);
-});
-
-socket.on("changeVideo", id => {
-    loadVideo(id, 0, true);
-});
-
-socket.on("play", t => {
-    syncing = true;
-    if (Math.abs(player.getCurrentTime() - t) > 1.5) player.seekTo(t, true);
-    player.playVideo();
-    setTimeout(() => syncing = false, 1000);
-});
-
-socket.on("pause", () => {
-    syncing = true;
-    player.pauseVideo();
-    setTimeout(() => syncing = false, 1000);
-});
-
-function loadVideo(id, t, play) {
-    syncing = true;
-    player.loadVideoById({ videoId: id, startSeconds: t });
-    statusText.innerText = "Đang chuyển bài...";
-    setTimeout(() => {
-        play ? player.playVideo() : player.pauseVideo();
-        syncing = false;
-        statusText.innerText = "Đang phát";
-    }, 1000);
-}
-
-// --- 4. TÌM KIẾM BÀI HÁT ---
-function search() {
-    const q = searchInput.value.trim();
-    if (!q) return;
-    resultsBox.classList.add("active");
-    resultsBox.innerHTML = '<p style="text-align:center; padding:20px; color:var(--text-sub);">🔍 Đang tìm kiếm...</p>';
-    socket.emit("searchSong", q);
-}
-
-socket.on("searchResults", list => {
-    resultsBox.innerHTML = "";
-    if (list.length === 0) {
-        resultsBox.innerHTML = '<p style="padding:15px; color:var(--text-sub);">Không tìm thấy bài nào.</p>';
-        return;
-    }
-    list.forEach(v => {
-        const d = document.createElement("div");
-        d.className = "result-item";
-        d.innerHTML = `
-            <img src="${v.thumbnail}">
-            <div>
-                <div class="result-title">${v.title}</div>
-                <div class="result-author">${v.author || ''}</div>
-            </div>
-        `;
-        d.onclick = () => {
-            socket.emit("addToList", v.id); // Thêm vào hàng chờ
-            resultsBox.classList.remove("active");
-            searchInput.value = "";
-        };
-        resultsBox.appendChild(d);
-    });
-});
-
-// --- 5. QUẢN LÝ HÀNG ĐỢI ---
-socket.on("updatePlaylist", list => {
-    queueBox.innerHTML = "";
-    if (list.length === 0) {
-        queueBox.innerHTML = '<p style="color:var(--text-sub); text-align:center; font-size:0.8em; margin-top:100px;">Trống...</p>';
-        return;
-    }
-    list.forEach((v, index) => {
-        const d = document.createElement("div");
-        d.className = "queue-item";
-        d.innerHTML = `
-            <div style="font-size: 0.8em; color: var(--accent-color); font-weight: bold; width: 20px;">${index + 1}</div>
-            <img src="${v.thumbnail || 'https://via.placeholder.com/60x34'}">
-            <div class="queue-title">${v.title}</div>
-            <i class="fas fa-trash" style="font-size: 0.8em; color: #ef4444; cursor: pointer" onclick="socket.emit('removeVideo', ${index})"></i>
-        `;
-        queueBox.appendChild(d);
-    });
-});
-
-function skip() {
-    socket.emit("skipVideo");
-}
-
-function playNow() {
-    // Hàm này dành cho việc dán link và phát ngay (nếu server của bạn hỗ trợ)
-    const q = searchInput.value.trim();
-    if(q.includes("youtube.com") || q.includes("youtu.be")) {
-        const id = q.match(/(?:https?:\/\/)?(?:www\.)?youtu\.?be(?:\.com)?\/?.*(?:watch|embed)?(?:.*v=|v\/|vi\/|u\/\w\/|shorts\/|e\/|(?:\?|&)v=)([^#\&\?]*).*/)[1];
-        if(id) socket.emit("changeVideo", id);
-        searchInput.value = "";
-    }
-}
-
-function addToList() {
-    const q = searchInput.value.trim();
-    if(q.includes("youtube.com") || q.includes("youtu.be")) {
-        const id = q.match(/(?:https?:\/\/)?(?:www\.)?youtu\.?be(?:\.com)?\/?.*(?:watch|embed)?(?:.*v=|v\/|vi\/|u\/\w\/|shorts\/|e\/|(?:\?|&)v=)([^#\&\?]*).*/)[1];
-        if(id) socket.emit("addToList", id);
-        searchInput.value = "";
-    }
-}
-
-// --- 6. CHAT VÀ BỘ LỌC EMOJI ---
-function send() {
-    let t = msgInput.value.trim();
-    if (!t) return;
-
-    // BỘ LỌC EMOJI TỰ ĐỘNG
-    const emojiMap = {
-        ":D": "😄",
-        ":)": "🙂",
-        ":(": "😟",
-        ":P": "😛",
-        "<3": "❤️"
-    };
-
-    Object.keys(emojiMap).forEach(key => {
-        t = t.replaceAll(key, emojiMap[key]);
-    });
-
-    socket.emit("chatMessage", { name: myName, message: t });
-    msgInput.value = "";
-}
-
-socket.on("chatMessage", d => {
-    const div = document.createElement("div");
-    div.className = "msg";
-    if (d.name === myName) div.classList.add("me");
-    else div.classList.add("other");
-
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    div.innerHTML = `
-        <span class="msg-sender">${d.name} • ${time}</span>
-        ${d.message}
-    `;
-
-    chatBox.appendChild(div);
-    chatBox.scrollTop = chatBox.scrollHeight;
-});
-
-// --- KHỞI TẠO YOUTUBE API ---
+// Load YT API
 const tag = document.createElement("script");
 tag.src = "https://www.youtube.com/iframe_api";
 document.body.appendChild(tag);
