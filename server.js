@@ -66,18 +66,16 @@ io.on('connection', socket => {
         if (!roomState.videoId) playNext();
     });
 
-    // --- LOGIC ƯU TIÊN & XÓA ---
     socket.on("priorityVideo", index => {
         if (playlist[index]) {
-            const item = playlist.splice(index, 1)[0];
-            playlist.unshift(item); // Đưa lên đầu mảng
+            playlist.unshift(playlist.splice(index, 1)[0]);
             io.emit("updateQueue", playlist);
         }
     });
 
     socket.on("removeVideo", index => {
         if (playlist[index]) {
-            playlist.splice(index, 1); // Xóa khỏi mảng
+            playlist.splice(index, 1);
             io.emit("updateQueue", playlist);
         }
     });
