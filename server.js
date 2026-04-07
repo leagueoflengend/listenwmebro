@@ -15,9 +15,10 @@ const youtube = google.youtube({
 
 app.use(express.static(__dirname));
 
-let playlist = [];
 let users = {};
+let playlist = [];
 
+// 🔥 trạng thái phòng
 let roomState = {
     videoId: null,
     time: 0,
@@ -25,7 +26,6 @@ let roomState = {
     lastUpdate: Date.now()
 };
 
-// 🔥 lấy thời gian chuẩn
 function getCurrentTime() {
     if (!roomState.isPlaying) return roomState.time;
     return roomState.time + (Date.now() - roomState.lastUpdate) / 1000;
@@ -35,17 +35,22 @@ io.on('connection', (socket) => {
 
     socket.on('join', (name) => {
         users[socket.id] = name || "Khách";
+        io.emit('updateUserList', Object.values(users));
 
+        // 🔥 gửi trạng thái thật
         socket.emit('initRoom', {
             videoId: roomState.videoId,
             time: getCurrentTime(),
             isPlaying: roomState.isPlaying
         });
-
-        socket.emit('updatePlaylist', playlist);
-        io.emit('updateUserList', Object.values(users));
     });
 
+    // ===== CHAT FIX =====
+    socket.on('chatMessage', (data) => {
+        io.emit('chatMessage', data);
+    });
+
+    // ===== SEARCH =====
     socket.on('searchSong', async (q) => {
         try {
             const res = await youtube.search.list({
@@ -65,55 +70,17 @@ io.on('connection', (socket) => {
             const results = vRes.data.items.map(v => ({
                 id: v.id,
                 title: v.snippet.title,
-                thumbnail: v.snippet.thumbnails.medium.url,
-                author: v.snippet.channelTitle,
-                duration: v.contentDetails.duration
+                thumbnail: v.snippet.thumbnails.medium.url
             }));
 
             socket.emit('searchResults', results);
         } catch (e) {
-            socket.emit('searchError', e.message);
+            console.log(e);
         }
     });
 
-    // 🔥 ADD VIDEO (FIX DUPLICATE + AUTO PLAY)
-    socket.on('addToList', async (id) => {
-        try {
-            // ❌ nếu đang phát bài này thì bỏ qua
-            if (roomState.videoId === id) return;
-
-            // ❌ nếu đã có trong queue thì bỏ qua
-            if (playlist.find(v => v.id === id)) return;
-
-            const res = await youtube.videos.list({ part: 'snippet', id });
-            if (!res.data.items[0]) return;
-
-            const video = {
-                id,
-                title: res.data.items[0].snippet.title
-            };
-
-            // 👉 chưa có gì phát → phát luôn
-            if (!roomState.videoId) {
-                roomState = {
-                    videoId: id,
-                    time: 0,
-                    isPlaying: true,
-                    lastUpdate: Date.now()
-                };
-                io.emit('changeVideo', id);
-            } else {
-                // 👉 đang phát → thêm queue
-                playlist.push(video);
-                io.emit('updatePlaylist', playlist);
-            }
-
-        } catch {}
-    });
-
+    // ===== CHANGE VIDEO =====
     socket.on('changeVideo', (id) => {
-        if (!id) return;
-
         roomState = {
             videoId: id,
             time: 0,
@@ -121,49 +88,24 @@ io.on('connection', (socket) => {
             lastUpdate: Date.now()
         };
 
-        // ❌ remove khỏi queue nếu có
-        playlist = playlist.filter(v => v.id !== id);
-
         io.emit('changeVideo', id);
-        io.emit('updatePlaylist', playlist);
     });
 
+    // ===== PLAY =====
     socket.on('play', (t) => {
-        roomState.isPlaying = true;
         roomState.time = t;
+        roomState.isPlaying = true;
         roomState.lastUpdate = Date.now();
+
         socket.broadcast.emit('play', t);
     });
 
+    // ===== PAUSE =====
     socket.on('pause', (t) => {
-        roomState.isPlaying = false;
         roomState.time = t;
-        roomState.lastUpdate = Date.now();
-        socket.broadcast.emit('pause');
-    });
+        roomState.isPlaying = false;
 
-    socket.on('skipVideo', () => {
-        if (playlist.length > 0) {
-            const next = playlist.shift();
-
-            roomState = {
-                videoId: next.id,
-                time: 0,
-                isPlaying: true,
-                lastUpdate: Date.now()
-            };
-
-            io.emit('changeVideo', next.id);
-            io.emit('updatePlaylist', playlist);
-        } else {
-            roomState.videoId = null;
-            roomState.isPlaying = false;
-        }
-    });
-
-    socket.on('removeVideo', (i) => {
-        playlist.splice(i, 1);
-        io.emit('updatePlaylist', playlist);
+        socket.broadcast.emit('pause', t);
     });
 
     socket.on('disconnect', () => {
