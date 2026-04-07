@@ -1,12 +1,18 @@
 const socket = io();
+const sInput = document.getElementById("sQueryInput");
+const rBox = document.getElementById("results");
+const chatBox = document.getElementById("chatMsgs");
+const userCount = document.getElementById("userCount");
+const userList = document.getElementById("userList");
+
 let myName = "";
 let player;
 let syncing = false;
 
 // 1. JOIN
 function handleJoin() {
-    myName = document.getElementById("userName").value.trim();
-    if (!myName) return;
+    myName = document.getElementById("uNameInput").value.trim();
+    if (!myName) return alert("Nhập tên đã!");
     socket.emit("join", myName);
     document.getElementById("join").style.display = "none";
 }
@@ -26,36 +32,49 @@ function onYouTubeIframeAPIReady() {
     });
 }
 
-// 3. SEARCH
+// 3. TÌM KIẾM & PHÁT LINK
 function handleSearch() {
-    const q = document.getElementById("searchInp").value.trim();
+    const q = sInput.value.trim();
     if (!q) return;
-    document.getElementById("results").innerHTML = "<p style='padding:10px'>Đang tìm...</p>";
+    rBox.classList.add("active");
+    rBox.innerHTML = '<p style="text-align:center; padding:15px;">🔍 Đang tìm...</p>';
     socket.emit("searchSong", q);
 }
 
 socket.on("searchResults", list => {
-    const box = document.getElementById("results");
-    box.innerHTML = list.map(v => `
-        <div class="res-item" onclick="addToQueue('${v.id}','${v.title.replace(/'/g, "")}','${v.thumbnail}')">
-            <img src="${v.thumbnail}" width="60">
-            <div style="font-size:0.8rem">${v.title}</div>
-        </div>
-    `).join("");
+    rBox.innerHTML = "";
+    if (list.length === 0) {
+        rBox.innerHTML = '<p style="padding:15px;">Không thấy bài nào.</p>';
+        return;
+    }
+    list.forEach(v => {
+        const d = document.createElement("div");
+        d.className = "result-item";
+        d.innerHTML = `<img src="${v.thumbnail}" width="80"><div><b style="font-size:0.85em">${v.title}</b></div>`;
+        d.onclick = () => {
+            socket.emit("addToQueue", v);
+            rBox.classList.remove("active");
+            sInput.value = "";
+        };
+        rBox.appendChild(d);
+    });
 });
 
-function addToQueue(id, title, thumbnail) {
-    socket.emit("addToQueue", { id, title, thumbnail });
-    document.getElementById("results").innerHTML = "";
-    document.getElementById("searchInp").value = "";
+function handlePlayNow() {
+    const q = sInput.value.trim();
+    const match = q.match(/(?:https?:\/\/)?(?:www\.)?youtu\.?be(?:\.com)?\/?.*(?:watch|embed)?(?:.*v=|v\/|vi\/|u\/\w\/|shorts\/|e\/|(?:\?|&)v=)([^#\&\?]*).*/);
+    if (match && match[1]) {
+        socket.emit("changeVideo", match[1]);
+        sInput.value = "";
+    } else { alert("Link không hợp lệ!"); }
 }
 
-// 4. SYNC LOGIC
+// 4. ĐỒNG BỘ
 socket.on("initRoom", d => {
     if (d.videoId) {
         syncing = true;
         player.loadVideoById({ videoId: d.videoId, startSeconds: d.time });
-        if (!d.isPlaying) setTimeout(() => player.pauseVideo(), 500);
+        if (!d.isPlaying) setTimeout(() => player.pauseVideo(), 800);
         setTimeout(() => syncing = false, 1500);
     }
 });
@@ -79,34 +98,43 @@ socket.on("pause", () => {
     setTimeout(() => syncing = false, 1000);
 });
 
-// 5. QUEUE & CHAT
+// 5. HÀNG ĐỢI & ONLINE LIST & CHAT
 socket.on("updateQueue", list => {
-    document.getElementById("queueBox").innerHTML = list.map(v => `
-        <div style="display:flex; gap:10px; margin:5px 0; font-size:0.8rem">
-            <img src="${v.thumbnail}" width="40"> <span>${v.title}</span>
+    document.getElementById("queue").innerHTML = list.map(v => `
+        <div style="display:flex; gap:10px; margin-bottom:10px; align-items:center;">
+            <img src="${v.thumbnail}" width="50" style="border-radius:4px">
+            <div style="font-size:0.75em; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">${v.title}</div>
         </div>
-    `).join("");
+    `).join("") || "<p style='text-align:center; color:var(--text-sub); font-size:0.8em; margin-top:50px;'>Trống...</p>";
+});
+
+socket.on("updateUserList", names => {
+    userCount.innerText = names.length;
+    userList.innerText = names.join(", ");
 });
 
 function handleSkip() { socket.emit("skip"); }
 
 function handleSend() {
-    let m = document.getElementById("msgInp").value.trim();
+    let m = document.getElementById("mInput").value.trim();
     if (!m) return;
-    const emojiMap = { ":D": "😄", ":)": "🙂", "<3": "❤️" };
-    Object.keys(emojiMap).forEach(k => m = m.replaceAll(k, emojiMap[k]));
+    const emoj = { ":D":"😄",":)":"🙂",":(":"😟","<3":"❤️" };
+    Object.keys(emoj).forEach(k => m = m.replaceAll(k, emoj[k]));
     socket.emit("chatMessage", { name: myName, message: m });
-    document.getElementById("msgInp").value = "";
+    document.getElementById("mInput").value = "";
 }
 
 socket.on("chatMessage", d => {
     const div = document.createElement("div");
-    div.innerHTML = `<b>${d.name}:</b> ${d.message}`;
-    document.getElementById("chatMsgs").appendChild(div);
-    document.getElementById("chatMsgs").scrollTop = document.getElementById("chatMsgs").scrollHeight;
+    div.className = `msg ${d.name === myName ? 'me' : 'other'}`;
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    div.innerHTML = `<b>${d.name}:</b> ${d.message} <span class="msg-time">${time}</span>`;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
 });
 
-// Load YT API
+window.onclick = e => { if (!rBox.contains(e.target) && e.target !== sInput) rBox.classList.remove("active"); };
+
 const tag = document.createElement("script");
 tag.src = "https://www.youtube.com/iframe_api";
 document.body.appendChild(tag);
