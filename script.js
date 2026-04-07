@@ -1,73 +1,87 @@
-// --- XỬ LÝ CLICK RA NGOÀI ĐỂ TẮT SEARCH ---
+// --- QUẢN LÝ GIAO DIỆN (THEME) ---
+function toggleTheme() {
+    const body = document.body;
+    const icon = document.getElementById('theme-icon');
+    
+    body.classList.toggle('dark-theme');
+    
+    if (body.classList.contains('dark-theme')) {
+        icon.className = 'fas fa-sun';
+        localStorage.setItem('theme', 'dark');
+    } else {
+        icon.className = 'fas fa-moon';
+        localStorage.setItem('theme', 'light');
+    }
+}
+
+// Kiểm tra theme đã lưu khi vừa tải trang
+(function() {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+        document.body.classList.add('dark-theme');
+        document.getElementById('theme-icon').className = 'fas fa-sun';
+    }
+})();
+
+// --- TỰ ĐỘNG TẮT SEARCH KHI CLICK RA NGOÀI ---
 window.addEventListener('click', function(e) {
-    if (!searchResultsBox.contains(e.target) && e.target !== youtubeLinkInput) {
+    const box = document.getElementById('searchResultsBox');
+    const input = document.getElementById('youtubeLink');
+    if (box.style.display === 'block' && !box.contains(e.target) && e.target !== input) {
         closeSearch();
     }
 });
 
-// --- TÍNH NĂNG JOIN PHÒNG ---
-function joinRoom() {
-    const name = document.getElementById('joinNameInput').value.trim();
-    if (!name) return alert("Bạn chưa nhập tên mà!");
-
-    // Gửi tên lên server
-    socket.emit('join', name);
-    
-    // Đồng bộ tên xuống ô chat luôn cho tiện
-    document.getElementById('nickname').value = name;
-    
-    // Ẩn modal
-    document.getElementById('joinModal').style.display = 'none';
-}
-
-// --- CẬP NHẬT DANH SÁCH TÊN ONLINE ---
-socket.on('updateUserList', (userNames) => {
-    const userListDiv = document.getElementById('userList');
-    const countElem = document.getElementById('userCount');
-    
-    countElem.innerText = userNames.length;
-    userListDiv.innerHTML = userNames.map(name => 
-        `<span style="background: rgba(158, 206, 106, 0.1); padding: 2px 8px; border-radius: 12px; font-size: 0.9em;">${name}</span>`
-    ).join('');
-});
-
-// Sửa lại hàm searchSong để thêm nút X đóng nhanh
+// Sửa lại hàm Search để có nút Đóng
 function searchSong() {
     const q = youtubeLinkInput.value.trim();
-    if (!q || getValidId()) return;
+    if (!q) return;
     
     searchResultsBox.style.display = 'block';
     searchResultsBox.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; padding: 10px; border-bottom: 1px solid #444;">
-            <span style="color:#9ece6a; font-size:0.8em;">KẾT QUẢ</span>
-            <button onclick="closeSearch()" style="background:none; color:#f7768e; border:none; cursor:pointer;">[Đóng X]</button>
+        <div style="display:flex; justify-content:space-between; padding:5px 10px; background:var(--playlist-bg); border-radius:5px 5px 0 0">
+            <small>KẾT QUẢ</small>
+            <span onclick="closeSearch()" style="cursor:pointer; color:#f7768e; font-weight:bold;">[X Đóng]</span>
         </div>
-        <div id="searchContent" style="padding:10px; text-align:center;">Đang tìm...</div>
+        <div id="searchInner" style="text-align:center; padding:10px;">Đang tìm...</div>
     `;
     socket.emit('searchSong', q);
 }
 
-// Cập nhật lại socket.on('searchResults') để nó nhét vào #searchContent thay vì ghi đè nút đóng
+// Cập nhật hàm nhận kết quả tìm kiếm
 socket.on('searchResults', (results) => {
-    const content = document.getElementById('searchContent');
-    if (!content) return;
-    
-    if (results.length === 0) {
-        content.innerHTML = "Không tìm thấy bài nào!";
-        return;
-    }
+    const inner = document.getElementById('searchInner');
+    if (!inner) return;
+    if (results.length === 0) { inner.innerHTML = "Không thấy bài nào!"; return; }
 
-    content.innerHTML = results.map(v => `
+    inner.innerHTML = results.map(v => `
         <div class="search-item">
             <img src="${v.thumbnail}">
             <div class="search-info">
                 <div class="search-title">${v.title}</div>
-                <div class="search-meta"><span>${v.duration}</span> • ${v.author}</div>
-                <div class="search-actions">
-                    <button onclick="socket.emit('changeVideo','${v.id}');closeSearch()">▶ Phát</button>
-                    <button class="btn-secondary" onclick="socket.emit('addToList','${v.id}');closeSearch()">+ Đợi</button>
+                <div style="font-size:0.8em; color:var(--sub-text)">${v.duration} • ${v.author}</div>
+                <div style="margin-top:5px">
+                    <button onclick="socket.emit('changeVideo','${v.id}');closeSearch()" style="padding:4px 8px; font-size:0.7em;">▶ Phát</button>
+                    <button onclick="socket.emit('addToList','${v.id}');closeSearch()" class="btn-secondary" style="padding:4px 8px; font-size:0.7em;">+ Đợi</button>
                 </div>
             </div>
         </div>
     `).join('');
+});
+
+// --- LOGIC NHẬP TÊN & ONLINE LIST ---
+function joinRoom() {
+    const nameInput = document.getElementById('joinNameInput');
+    const name = nameInput.value.trim();
+    if (!name) return alert("Vui lòng cho mình biết tên bạn!");
+    
+    socket.emit('join', name);
+    document.getElementById('joinModal').style.display = 'none';
+}
+
+socket.on('updateUserList', (names) => {
+    const count = document.getElementById('userCount');
+    const list = document.getElementById('userList');
+    count.innerText = names.length;
+    list.innerHTML = names.map(n => `<span style="background:var(--accent-color); color:#fff; padding:2px 8px; border-radius:10px; font-size:0.8em; margin-right:5px;">${n}</span>`).join('');
 });
