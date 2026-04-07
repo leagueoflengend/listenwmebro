@@ -44,38 +44,35 @@
         .queue-box { height: 200px; overflow-y: auto; padding: 10px; margin-bottom: 15px; }
         .chat-area { height: 380px; display: flex; flex-direction: column; overflow: hidden; }
         #chatMsgs { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-        .msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 0.9em; position: relative; }
+        .msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 0.9em; }
         .msg-time { font-size: 0.7em; opacity: 0.5; margin-left: 8px; }
         .msg.me { align-self: flex-end; background: var(--bg-msg-me); color: white; }
         .msg.other { align-self: flex-start; background: var(--bg-msg-other); }
         #join { position: fixed; inset: 0; background: var(--bg-body); z-index: 1000; display: flex; justify-content: center; align-items: center; }
-        /* Style cho nút trong hàng đợi */
-        .q-btn { background: none; border: none; padding: 5px; cursor: pointer; color: var(--text-sub); transition: 0.2s; }
-        .q-btn:hover { color: var(--accent-color); transform: scale(1.2); }
     </style>
 </head>
 <body>
     <div id="join">
         <div style="text-align:center; background:var(--bg-container); padding:40px; border-radius:20px; border: 1px solid var(--border-color); backdrop-filter: blur(10px);">
             <h2>🎵 Music Room Pro</h2>
-            <input id="uNameInp" placeholder="Tên của bạn..." onkeypress="if(event.key==='Enter')app.join()">
-            <button onclick="app.join()" style="width:100%; margin-top:10px;">Vào phòng</button>
+            <input id="uNameInp" placeholder="Tên của bạn..." onkeypress="if(event.key==='Enter') handleJoin()">
+            <button id="btnJoin" onclick="handleJoin()" style="width:100%; margin-top:10px;">Vào phòng</button>
         </div>
     </div>
     <div class="container">
-        <div class="theme-switch" onclick="app.toggleTheme()"><i id="theme-icon" class="fas fa-moon"></i></div>
+        <div class="theme-switch" onclick="toggleTheme()"><i id="theme-icon" class="fas fa-moon"></i></div>
         <div class="main">
             <div class="online-info">🟢 Online (<span id="uCount">0</span>): <span id="uList">...</span></div>
             <div class="player-container"><div id="player"></div></div>
             <div class="search-area" style="position:relative">
                 <div class="search-bar">
-                    <input id="sInp" placeholder="Tìm bài hoặc dán link..." onkeypress="if(event.key==='Enter')app.search()">
-                    <button onclick="app.search()">Tìm bài</button>
-                    <button onclick="app.playLink()" style="background:#10b981">Thêm Link</button>
+                    <input id="sInp" placeholder="Tìm bài hoặc dán link..." onkeypress="if(event.key==='Enter') handleSearch()">
+                    <button id="btnSearch" onclick="handleSearch()">Tìm bài</button>
+                    <button id="btnLink" onclick="handlePlayLink()" style="background:#10b981">Thêm Link</button>
                 </div>
                 <div id="results" class="results-box"></div>
             </div>
-            <button onclick="app.skip()" style="width:100%; background:#ef4444; margin-top:5px">⏭ Skip bài</button>
+            <button id="btnSkip" onclick="handleSkip()" style="width:100%; background:#ef4444; margin-top:5px">⏭ Skip bài</button>
         </div>
         <div class="sidebar">
             <h3 style="margin: 0 0 10px 0; font-size: 1em; color: var(--accent-color);">📜 HÀNG ĐỢI</h3>
@@ -83,8 +80,8 @@
             <div class="chat-area">
                 <div id="chatMsgs"></div>
                 <div style="display:flex; gap:5px; padding:10px; border-top:1px solid var(--border-color)">
-                    <input id="mInp" placeholder="Chat..." onkeypress="if(event.key==='Enter')app.send()">
-                    <button onclick="app.send()">Gửi</button>
+                    <input id="mInp" placeholder="Chat..." onkeypress="if(event.key==='Enter') handleSend()">
+                    <button id="btnSend" onclick="handleSend()">Gửi</button>
                 </div>
             </div>
         </div>
