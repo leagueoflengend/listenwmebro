@@ -43,6 +43,7 @@ io.on('connection', (socket) => {
     socket.emit('initRoom', { videoId: roomState.videoId, time: currentT, isPlaying: roomState.isPlaying });
     socket.emit('updatePlaylist', playlist);
 
+    // LOGIC TÌM KIẾM
     socket.on('searchSong', async (q) => {
         try {
             const res = await youtube.search.list({ part: 'snippet', q, maxResults: 5, type: 'video' });
@@ -56,11 +57,12 @@ io.on('connection', (socket) => {
             }));
             socket.emit('searchResults', results);
         } catch (e) {
-            console.error("Lỗi API:", e.message);
+            console.error("LỖI API YOUTUBE:", e.message); // Kiểm tra lỗi này ở tab Logs trên Render
             socket.emit('searchResults', []);
         }
     });
 
+    // CHỈ THÊM VÀO DANH SÁCH, KHÔNG PHÁT
     socket.on('addToList', async (id) => {
         try {
             const res = await youtube.videos.list({ part: 'snippet', id });
@@ -68,10 +70,13 @@ io.on('connection', (socket) => {
             if (video) {
                 playlist.push({ id, title: video.snippet.title });
                 io.emit('updatePlaylist', playlist);
+                // Gửi thông báo nhỏ cho người dùng
+                socket.emit('chatMessage', { name: "Hệ thống", message: `Đã thêm [${video.snippet.title}] vào hàng chờ.` });
             }
         } catch (e) {}
     });
 
+    // CHỈ PHÁT KHI BẤM "PHÁT LINK" HOẶC SKIP
     socket.on('changeVideo', (videoId) => {
         roomState = { videoId, time: 0, isPlaying: true, lastUpdate: Date.now() };
         io.emit('changeVideo', videoId);
