@@ -12,7 +12,7 @@ let syncing = false;
 // 1. JOIN
 function handleJoin() {
     myName = document.getElementById("uNameInput").value.trim();
-    if (!myName) return alert("Nhập tên đã!");
+    if (!myName) return;
     socket.emit("join", myName);
     document.getElementById("join").style.display = "none";
 }
@@ -20,7 +20,6 @@ function handleJoin() {
 // 2. YOUTUBE API
 function onYouTubeIframeAPIReady() {
     player = new YT.Player("player", {
-        height: '100%', width: '100%',
         events: {
             onStateChange: e => {
                 if (syncing) return;
@@ -32,7 +31,7 @@ function onYouTubeIframeAPIReady() {
     });
 }
 
-// 3. TÌM KIẾM & PHÁT LINK
+// 3. SEARCH & PLAY
 function handleSearch() {
     const q = sInput.value.trim();
     if (!q) return;
@@ -43,10 +42,7 @@ function handleSearch() {
 
 socket.on("searchResults", list => {
     rBox.innerHTML = "";
-    if (list.length === 0) {
-        rBox.innerHTML = '<p style="padding:15px;">Không thấy bài nào.</p>';
-        return;
-    }
+    if (list.length === 0) { rBox.innerHTML = '<p style="padding:15px;">Không thấy bài nào.</p>'; return; }
     list.forEach(v => {
         const d = document.createElement("div");
         d.className = "result-item";
@@ -66,10 +62,10 @@ function handlePlayNow() {
     if (match && match[1]) {
         socket.emit("changeVideo", match[1]);
         sInput.value = "";
-    } else { alert("Link không hợp lệ!"); }
+    }
 }
 
-// 4. ĐỒNG BỘ
+// 4. SYNC
 socket.on("initRoom", d => {
     if (d.videoId) {
         syncing = true;
@@ -98,14 +94,14 @@ socket.on("pause", () => {
     setTimeout(() => syncing = false, 1000);
 });
 
-// 5. HÀNG ĐỢI & ONLINE LIST & CHAT
+// 5. QUEUE, ONLINE & CHAT
 socket.on("updateQueue", list => {
     document.getElementById("queue").innerHTML = list.map(v => `
         <div style="display:flex; gap:10px; margin-bottom:10px; align-items:center;">
             <img src="${v.thumbnail}" width="50" style="border-radius:4px">
             <div style="font-size:0.75em; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">${v.title}</div>
         </div>
-    `).join("") || "<p style='text-align:center; color:var(--text-sub); font-size:0.8em; margin-top:50px;'>Trống...</p>";
+    `).join("") || "Trống...";
 });
 
 socket.on("updateUserList", names => {
