@@ -1,112 +1,79 @@
-const socket = io();
-let myName = "";
-let player;
-let syncing = false;
+require('dotenv').config();
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const { google } = require('googleapis');
 
-// 1. JOIN
-function handleJoin() {
-    myName = document.getElementById("userName").value.trim();
-    if (!myName) return;
-    socket.emit("join", myName);
-    document.getElementById("join").style.display = "none";
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
+const youtube = google.youtube({ version: 'v3', auth: process.env.YOUTUBE_API_KEY });
+
+app.use(express.static(__dirname));
+
+let users = {};
+let playlist = [];
+let roomState = { videoId: 'y881t8SK8tE', time: 0, isPlaying: false, lastUpdate: Date.now() };
+
+function playNext() {
+    if (playlist.length === 0) return;
+    const next = playlist.shift();
+    roomState = { videoId: next.id, time: 0, isPlaying: true, lastUpdate: Date.now() };
+    io.emit("changeVideo", next.id);
+    io.emit("updateQueue", playlist);
 }
 
-// 2. YOUTUBE API
-function onYouTubeIframeAPIReady() {
-    player = new YT.Player("player", {
-        height: '100%', width: '100%',
-        events: {
-            onStateChange: e => {
-                if (syncing) return;
-                if (e.data === 1) socket.emit("play", player.getCurrentTime());
-                if (e.data === 2) socket.emit("pause", player.getCurrentTime());
-                if (e.data === 0) socket.emit("ended");
-            }
+io.on('connection', socket => {
+    // 1. JOIN
+    socket.on("join", name => {
+        users[socket.id] = name || "Khách";
+        socket.emit("initRoom", { 
+            videoId: roomState.videoId, 
+            time: roomState.isPlaying ? roomState.time + (Date.now() - roomState.lastUpdate)/1000 : roomState.time, 
+            isPlaying: roomState.isPlaying 
+        });
+        socket.emit("updateQueue", playlist);
+        io.emit("chatMessage", { name: "Hệ thống", message: `👋 ${users[socket.id]} đã vào.` });
+    });
+
+    // 2. SEARCH
+    socket.on("searchSong", async q => {
+        try {
+            const res = await youtube.search.list({ part: 'snippet', q, maxResults: 5, type: 'video' });
+            const results = res.data.items.map(v => ({
+                id: v.id.videoId, title: v.snippet.title, thumbnail: v.snippet.thumbnails.medium.url
+            }));
+            socket.emit("searchResults", results);
+        } catch (e) { socket.emit("searchResults", []); }
+    });
+
+    // 3. QUEUE LOGIC
+    socket.on("addToQueue", item => {
+        if (!roomState.videoId) {
+            roomState = { videoId: item.id, time: 0, isPlaying: true, lastUpdate: Date.now() };
+            io.emit("changeVideo", item.id);
+        } else {
+            playlist.push(item);
+            io.emit("updateQueue", playlist);
         }
     });
-}
 
-// 3. SEARCH
-function handleSearch() {
-    const q = document.getElementById("searchInp").value.trim();
-    if (!q) return;
-    document.getElementById("results").innerHTML = "<p style='padding:10px'>Đang tìm...</p>";
-    socket.emit("searchSong", q);
-}
+    socket.on("skip", () => playNext());
+    socket.on("ended", () => playNext());
 
-socket.on("searchResults", list => {
-    const box = document.getElementById("results");
-    box.innerHTML = list.map(v => `
-        <div class="res-item" onclick="addToQueue('${v.id}','${v.title.replace(/'/g, "")}','${v.thumbnail}')">
-            <img src="${v.thumbnail}" width="60">
-            <div style="font-size:0.8rem">${v.title}</div>
-        </div>
-    `).join("");
+    // 4. SYNC
+    socket.on("play", t => {
+        roomState.time = t; roomState.isPlaying = true; roomState.lastUpdate = Date.now();
+        socket.broadcast.emit("play", t);
+    });
+    socket.on("pause", t => {
+        roomState.time = t; roomState.isPlaying = false;
+        socket.broadcast.emit("pause", t);
+    });
+
+    socket.on("chatMessage", d => io.emit("chatMessage", d));
+    socket.on("disconnect", () => { delete users[socket.id]; });
 });
 
-function addToQueue(id, title, thumbnail) {
-    socket.emit("addToQueue", { id, title, thumbnail });
-    document.getElementById("results").innerHTML = "";
-    document.getElementById("searchInp").value = "";
-}
-
-// 4. SYNC LOGIC
-socket.on("initRoom", d => {
-    if (d.videoId) {
-        syncing = true;
-        player.loadVideoById({ videoId: d.videoId, startSeconds: d.time });
-        if (!d.isPlaying) setTimeout(() => player.pauseVideo(), 500);
-        setTimeout(() => syncing = false, 1500);
-    }
-});
-
-socket.on("changeVideo", id => {
-    syncing = true;
-    player.loadVideoById(id);
-    setTimeout(() => syncing = false, 1000);
-});
-
-socket.on("play", t => {
-    syncing = true;
-    if (Math.abs(player.getCurrentTime() - t) > 1.5) player.seekTo(t, true);
-    player.playVideo();
-    setTimeout(() => syncing = false, 1000);
-});
-
-socket.on("pause", () => {
-    syncing = true;
-    player.pauseVideo();
-    setTimeout(() => syncing = false, 1000);
-});
-
-// 5. QUEUE & CHAT
-socket.on("updateQueue", list => {
-    document.getElementById("queueBox").innerHTML = list.map(v => `
-        <div style="display:flex; gap:10px; margin:5px 0; font-size:0.8rem">
-            <img src="${v.thumbnail}" width="40"> <span>${v.title}</span>
-        </div>
-    `).join("");
-});
-
-function handleSkip() { socket.emit("skip"); }
-
-function handleSend() {
-    let m = document.getElementById("msgInp").value.trim();
-    if (!m) return;
-    const emojiMap = { ":D": "😄", ":)": "🙂", "<3": "❤️" };
-    Object.keys(emojiMap).forEach(k => m = m.replaceAll(k, emojiMap[k]));
-    socket.emit("chatMessage", { name: myName, message: m });
-    document.getElementById("msgInp").value = "";
-}
-
-socket.on("chatMessage", d => {
-    const div = document.createElement("div");
-    div.innerHTML = `<b>${d.name}:</b> ${d.message}`;
-    document.getElementById("chatMsgs").appendChild(div);
-    document.getElementById("chatMsgs").scrollTop = document.getElementById("chatMsgs").scrollHeight;
-});
-
-// Load YT API
-const tag = document.createElement("script");
-tag.src = "https://www.youtube.com/iframe_api";
-document.body.appendChild(tag);
+server.listen(process.env.PORT || 10000);
