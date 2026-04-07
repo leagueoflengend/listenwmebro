@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config(); // Đọc API Key từ file .env
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -8,6 +8,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+// Cấu hình Google YouTube API
 const youtube = google.youtube({
     version: 'v3',
     auth: process.env.YOUTUBE_API_KEY
@@ -15,8 +16,8 @@ const youtube = google.youtube({
 
 app.use(express.static(__dirname));
 
+// Dữ liệu phòng và Playlist
 let playlist = [];
-let users = {}; 
 let roomState = {
     videoId: 'y881t8SK8tE', 
     time: 0,
@@ -24,81 +25,135 @@ let roomState = {
     lastUpdate: Date.now()
 };
 
-function formatDuration(iso) {
-    if(!iso) return "0:00";
-    const m = iso.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
-    const h = (parseInt(m[1]) || 0), min = (parseInt(m[2]) || 0), s = (parseInt(m[3]) || 0);
-    if (h > 0) return `${h}:${min.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-    return `${min}:${s.toString().padStart(2,'0')}`;
+// Hàm hỗ trợ: Chuyển đổi định dạng thời gian YouTube (PT3M45S -> 3:45)
+function formatDuration(isoDuration) {
+    const match = isoDuration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+    const hours = (parseInt(match[1]) || 0);
+    const minutes = (parseInt(match[2]) || 0);
+    const seconds = (parseInt(match[3]) || 0);
+    if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 io.on('connection', (socket) => {
-    socket.on('join', (name) => {
-        users[socket.id] = name || `Khách ${socket.id.substring(0,4)}`;
-        io.emit('updateUserList', Object.values(users));
-    });
+    // --- TÍNH NĂNG: ĐẾM NGƯỜI ONLINE ---
+    io.emit('updateUserCount', io.engine.clientsCount);
+    console.log('Một người dùng kết nối. Tổng số:', io.engine.clientsCount);
 
-    let currentT = roomState.time;
-    if (roomState.isPlaying) currentT += (Date.now() - roomState.lastUpdate) / 1000;
-    socket.emit('initRoom', { videoId: roomState.videoId, time: currentT, isPlaying: roomState.isPlaying });
+    // Gửi trạng thái hiện tại cho người mới vào
+    let currentTime = roomState.time;
+    if (roomState.isPlaying) {
+        currentTime += (Date.now() - roomState.lastUpdate) / 1000;
+    }
+    
+    socket.emit('initRoom', {
+        videoId: roomState.videoId,
+        time: currentTime,
+        isPlaying: roomState.isPlaying
+    });
     socket.emit('updatePlaylist', playlist);
 
-    // LOGIC TÌM KIẾM
-    socket.on('searchSong', async (q) => {
+    // --- TÍNH NĂNG: TÌM KIẾM NHẠC (GOOGLE API) ---
+    socket.on('searchSong', async (query) => {
         try {
-            const res = await youtube.search.list({ part: 'snippet', q, maxResults: 5, type: 'video' });
-            const ids = res.data.items.map(i => i.id.videoId).filter(id => id).join(',');
-            if (!ids) return socket.emit('searchResults', []);
+            const searchRes = await youtube.search.list({
+                part: 'snippet',
+                q: query,
+                maxResults: 5,
+                type: 'video'
+            });
+            const videoIds = searchRes.data.items.map(item => item.id.videoId).join(',');
+            const videoRes = await youtube.videos.list({
+                part: 'contentDetails,snippet',
+                id: videoIds
+            });
 
-            const vRes = await youtube.videos.list({ part: 'contentDetails,snippet', id: ids });
-            const results = vRes.data.items.map(v => ({
-                id: v.id, title: v.snippet.title, thumbnail: v.snippet.thumbnails.medium.url,
-                author: v.snippet.channelTitle, duration: formatDuration(v.contentDetails.duration)
+            const results = videoRes.data.items.map(v => ({
+                id: v.id,
+                title: v.snippet.title,
+                thumbnail: v.snippet.thumbnails.medium.url,
+                author: v.snippet.channelTitle,
+                duration: formatDuration(v.contentDetails.duration)
             }));
             socket.emit('searchResults', results);
-        } catch (e) {
-            console.error("LỖI API YOUTUBE:", e.message); // Kiểm tra lỗi này ở tab Logs trên Render
+        } catch (error) {
+            console.error("Lỗi tìm kiếm:", error);
             socket.emit('searchResults', []);
         }
     });
 
-    // CHỈ THÊM VÀO DANH SÁCH, KHÔNG PHÁT
-    socket.on('addToList', async (id) => {
+    // --- QUẢN LÝ PLAYLIST ---
+    socket.on('addToList', async (videoId) => {
         try {
-            const res = await youtube.videos.list({ part: 'snippet', id });
-            const video = res.data.items[0];
-            if (video) {
-                playlist.push({ id, title: video.snippet.title });
-                io.emit('updatePlaylist', playlist);
-                // Gửi thông báo nhỏ cho người dùng
-                socket.emit('chatMessage', { name: "Hệ thống", message: `Đã thêm [${video.snippet.title}] vào hàng chờ.` });
-            }
-        } catch (e) {}
+            const res = await youtube.videos.list({ part: 'snippet', id: videoId });
+            const videoTitle = res.data.items[0]?.snippet.title || "Video không xác định";
+            playlist.push({ id: videoId, title: videoTitle });
+            io.emit('updatePlaylist', playlist);
+        } catch (error) {
+            console.error("Lỗi lấy thông tin video:", error);
+        }
     });
 
-    // CHỈ PHÁT KHI BẤM "PHÁT LINK" HOẶC SKIP
-    socket.on('changeVideo', (videoId) => {
-        roomState = { videoId, time: 0, isPlaying: true, lastUpdate: Date.now() };
-        io.emit('changeVideo', videoId);
-    });
-
-    socket.on('play', (t) => { roomState.isPlaying = true; roomState.time = t; roomState.lastUpdate = Date.now(); socket.broadcast.emit('play', t); });
-    socket.on('pause', (t) => { roomState.isPlaying = false; roomState.time = t; roomState.lastUpdate = Date.now(); socket.broadcast.emit('pause'); });
-    
-    socket.on('skipVideo', () => {
-        if (playlist.length > 0) {
-            const next = playlist.shift();
-            roomState = { videoId: next.id, time: 0, isPlaying: true, lastUpdate: Date.now() };
-            io.emit('changeVideo', next.id);
+    socket.on('removeVideo', (index) => {
+        if (index >= 0 && index < playlist.length) {
+            playlist.splice(index, 1);
             io.emit('updatePlaylist', playlist);
         }
     });
 
-    socket.on('removeVideo', (i) => { playlist.splice(i, 1); io.emit('updatePlaylist', playlist); });
-    socket.on('moveVideoToTop', (i) => { playlist.unshift(playlist.splice(i, 1)[0]); io.emit('updatePlaylist', playlist); });
-    socket.on('chatMessage', (d) => io.emit('chatMessage', d));
-    socket.on('disconnect', () => { delete users[socket.id]; io.emit('updateUserList', Object.values(users)); });
+    socket.on('moveVideoToTop', (index) => {
+        if (index > 0 && index < playlist.length) {
+            const item = playlist.splice(index, 1)[0];
+            playlist.unshift(item);
+            io.emit('updatePlaylist', playlist);
+        }
+    });
+
+    socket.on('skipVideo', () => {
+        if (playlist.length > 0) {
+            const nextVideo = playlist.shift();
+            updateAndBroadcast(nextVideo.id, 0, true);
+            io.emit('changeVideo', nextVideo.id);
+            io.emit('updatePlaylist', playlist);
+        }
+    });
+
+    // --- ĐIỀU KHIỂN ĐỒNG BỘ ---
+    function updateAndBroadcast(id, time, isPlaying) {
+        roomState.videoId = id || roomState.videoId;
+        roomState.time = time;
+        roomState.isPlaying = isPlaying;
+        roomState.lastUpdate = Date.now();
+    }
+
+    socket.on('changeVideo', (videoId) => {
+        updateAndBroadcast(videoId, 0, true);
+        io.emit('changeVideo', videoId);
+    });
+
+    socket.on('play', (time) => {
+        updateAndBroadcast(null, time, true);
+        socket.broadcast.emit('play', time);
+    });
+
+    socket.on('pause', (time) => {
+        updateAndBroadcast(null, time || roomState.time, false);
+        socket.broadcast.emit('pause');
+    });
+
+    socket.on('chatMessage', (data) => {
+        io.emit('chatMessage', data);
+    });
+
+    socket.on('disconnect', () => {
+        io.emit('updateUserCount', io.engine.clientsCount);
+        console.log('Người dùng ngắt kết nối. Còn lại:', io.engine.clientsCount);
+    });
 });
 
-const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => console.log(`Server chạy tại port ${PORT}`));
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Server đang chạy tại port ${PORT}`);
+});
