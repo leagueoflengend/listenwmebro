@@ -5,59 +5,78 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Listen With Me 🎵</title>
     <style>
+        /* CSS GỐC CỦA BẠN */
         body { font-family: 'Segoe UI', sans-serif; background-color: #1a1b26; color: #a9b1d6; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box;}
-        .container { background-color: #24283b; padding: 25px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.4); text-align: center; width: 100%; max-width: 650px; }
-        h1 { color: #7aa2f7; margin-bottom: 10px; margin-top: 0;}
+        .container { background-color: #24283b; padding: 25px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.4); text-align: center; width: 100%; max-width: 650px; position: relative;}
+        h1 { color: #7aa2f7; margin-bottom: 5px; margin-top: 0;}
+        
+        /* HIỂN THỊ ONLINE */
+        .online-count { font-size: 0.85em; color: #9ece6a; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .dot { width: 8px; height: 8px; background-color: #9ece6a; border-radius: 50%; display: inline-block; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
         .controls { margin: 15px 0; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;}
         input[type="text"] { flex-grow: 1; padding: 10px; border-radius: 6px; border: 1px solid #414868; background-color: #1a1b26; color: #a9b1d6; outline: none; min-width: 200px;}
         button { padding: 10px 15px; border: none; border-radius: 6px; background-color: #7aa2f7; color: #1a1b26; font-weight: bold; cursor: pointer; transition: 0.2s;}
-        button:hover { background-color: #89b4fa; }
+        button:hover { opacity: 0.8; }
         .btn-secondary { background-color: #bb9af7; }
         .btn-danger { background-color: #f7768e; }
-        
-        #youtubePlayerContainer { margin-top: 20px; aspect-ratio: 16 / 9; width: 100%; transition: 0.3s; }
+        .btn-search { background-color: #9ece6a; }
+
+        /* KHUNG KẾT QUẢ TÌM KIẾM (ĐÃ NÂNG CẤP) */
+        .search-results { 
+            position: absolute; top: 100px; left: 5%; width: 90%; 
+            background: #16161e; border: 1px solid #444; border-radius: 8px; 
+            z-index: 100; display: none; max-height: 400px; overflow-y: auto; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6); padding: 5px;
+        }
+        .search-item { display: flex; gap: 12px; padding: 10px; border-bottom: 1px solid #292e42; text-align: left; transition: 0.2s;}
+        .search-item:hover { background: #292e42; }
+        .search-item img { width: 100px; height: 56px; border-radius: 4px; object-fit: cover;}
+        .search-info { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        .search-title { color: #7dcfff; font-weight: bold; font-size: 0.9em; line-height: 1.2; margin-bottom: 4px;}
+        .search-meta { font-size: 0.75em; color: #565f89; }
+        .search-meta span { background: #f7768e; color: #fff; padding: 1px 4px; border-radius: 3px; margin-right: 5px;}
+        .search-actions { display: flex; gap: 5px; margin-top: 5px; }
+        .search-actions button { padding: 4px 8px; font-size: 0.75em; }
+
+        #youtubePlayerContainer { margin-top: 20px; aspect-ratio: 16 / 9; width: 100%; }
         iframe { width: 100%; height: 100%; border: none; border-radius: 8px; }
         .audio-only-mode { display: none !important; }
 
-        /* Tùy chỉnh Khung Danh sách phát mới */
+        /* DANH SÁCH CHỜ */
         .playlist-box { margin-top: 20px; text-align: left; background: #1f2335; padding: 15px; border-radius: 8px;}
         .playlist-box h3 { margin: 0 0 10px 0; color: #9ece6a; font-size: 1.1em;}
         ul { list-style: none; padding: 0; margin: 0; }
-        
-        .playlist-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 8px; border-bottom: 1px solid #292e42; font-size: 0.9em; transition: 0.2s;}
-        .playlist-item:hover { background-color: #292e42; border-radius: 6px;}
-        .playlist-item:last-child { border-bottom: none; }
+        .playlist-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #292e42; font-size: 0.9em;}
         .playlist-item-title { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }
-        .playlist-actions button { padding: 4px 8px; font-size: 0.8em; margin-left: 5px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;}
-        .btn-up { background-color: #e0af68; color: #1a1b26; }
-        .btn-del { background-color: #f7768e; color: #1a1b26; }
-
-        #statusText { margin-top: 15px; font-size: 0.9em; color: #565f89; }
-
-        /* Khung Chat */
+        
+        /* CHAT */
         .chat-container { margin-top: 20px; background: #1f2335; padding: 15px; border-radius: 8px; text-align: left;}
-        .chat-container h3 { margin: 0 0 10px 0; color: #ff9e64; font-size: 1.1em;}
-        .name-input { margin-bottom: 10px; display: flex; gap: 10px; align-items: center; }
-        .name-input label { color: #a9b1d6; font-weight: bold; white-space: nowrap; }
-        .name-input input { padding: 8px; width: 150px;}
-        .chat-messages { height: 150px; overflow-y: auto; background: #16161e; padding: 10px; border-radius: 6px; margin-bottom: 10px; font-size: 0.95em; display: flex; flex-direction: column; gap: 8px;}
+        .chat-messages { height: 120px; overflow-y: auto; background: #16161e; padding: 10px; border-radius: 6px; margin: 10px 0; font-size: 0.9em;}
         .chat-input-box { display: flex; gap: 8px; }
-        .chat-msg strong { color: #7dcfff; } 
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🎵 Listen With Me</h1>
         
+        <div class="online-count">
+            <span class="dot"></span> Đang online: <span id="userCount">1</span> người
+        </div>
+        
         <div class="controls">
-            <input type="text" id="youtubeLink" placeholder="Dán link YouTube vào đây...">
-            <button onclick="playNow()">Phát Ngay</button>
+            <input type="text" id="youtubeLink" placeholder="Tìm tên bài hát hoặc dán link...">
+            <button onclick="searchSong()" class="btn-search">🔍 Tìm kiếm</button>
+            <button onclick="playNow()">Phát Link</button>
             <button onclick="addToList()" class="btn-secondary">+ Hàng Đợi</button>
         </div>
 
+        <div id="searchResultsBox" class="search-results"></div>
+
         <div class="controls">
-            <button onclick="skipVideo()" class="btn-danger">⏭️ Chuyển bài (Skip)</button>
-            <button onclick="toggleVideoMode()" id="toggleBtn">🎧 Chế độ: Đang xem Video</button>
+            <button onclick="skipVideo()" class="btn-danger" style="flex:1">⏭️ Chuyển bài</button>
+            <button onclick="toggleVideoMode()" id="toggleBtn" style="flex:1">🎧 Chế độ: Video</button>
         </div>
 
         <div id="youtubePlayerContainer">
@@ -65,24 +84,21 @@
         </div>
         <div id="statusText">Trạng thái: Đang kết nối...</div>
 
-        <div class="chat-container">
-            <h3>💬 Trò chuyện</h3>
-            <div class="name-input">
-                <label for="nickname">Biệt danh:</label>
-                <input type="text" id="nickname" placeholder="Nhập tên..." value="Khách Ẩn Danh">
-            </div>
-            <div id="chatMessages" class="chat-messages"></div>
-            <div class="chat-input-box">
-                <input type="text" id="chatInput" placeholder="Nhập tin nhắn..." onkeypress="handleKeyPress(event)">
-                <button onclick="sendMessage()">Gửi</button>
-            </div>
-        </div>
-
         <div class="playlist-box">
             <h3>Danh sách chờ:</h3>
             <ul id="playlistUI">
-                <li>Danh sách đang trống...</li>
+                <li>Đang tải danh sách...</li>
             </ul>
+        </div>
+
+        <div class="chat-container">
+            <h3>💬 Trò chuyện</h3>
+            <div class="name-input">
+                <input type="text" id="nickname" placeholder="Tên của bạn..." value="Khách" style="width: 100px;">
+                <input type="text" id="chatInput" placeholder="Nhập tin nhắn..." onkeypress="handleKeyPress(event)" style="flex: 1;">
+                <button onclick="sendMessage()">Gửi</button>
+            </div>
+            <div id="chatMessages" class="chat-messages"></div>
         </div>
     </div>
 
