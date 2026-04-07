@@ -1,56 +1,58 @@
 const socket = io();
 
-let name = "";
+let name="";
 let player;
-let syncing = false;
+let syncing=false;
 
 // emoji
 function emoji(t){
     return t.replace(/:D/g,"😄").replace(/:\)/g,"🙂").replace(/:\(/g,"🙁");
 }
 
-// join
+// join FIX
 function join(){
-    name = document.getElementById("name").value;
-    socket.emit("join", name);
+    name=document.getElementById("name").value.trim();
+    if(!name) return alert("Nhập tên đi bro");
+
+    socket.emit("join",name);
     document.getElementById("join").style.display="none";
 }
 
 // youtube
 function onYouTubeIframeAPIReady(){
-    player = new YT.Player("player", {
+    player=new YT.Player("player",{
         events:{
             onStateChange:e=>{
                 if(syncing) return;
 
                 if(e.data===1)
-                    socket.emit("play", player.getCurrentTime());
+                    socket.emit("play",player.getCurrentTime());
 
                 if(e.data===2)
-                    socket.emit("pause", player.getCurrentTime());
+                    socket.emit("pause",player.getCurrentTime());
             }
         }
     });
 }
 
 // sync
-socket.on("initRoom", d=>{
+socket.on("initRoom",d=>{
     if(!d.videoId) return;
     load(d.videoId,d.time,d.isPlaying);
 });
 
-socket.on("changeVideo", id=>{
+socket.on("changeVideo",id=>{
     load(id,0,true);
 });
 
-socket.on("play", t=>{
+socket.on("play",t=>{
     syncing=true;
     player.seekTo(t);
     player.playVideo();
     setTimeout(()=>syncing=false,500);
 });
 
-socket.on("pause", t=>{
+socket.on("pause",t=>{
     syncing=true;
     player.seekTo(t);
     player.pauseVideo();
@@ -63,26 +65,34 @@ function load(id,t,play){
     setTimeout(()=>{
         play?player.playVideo():player.pauseVideo();
         syncing=false;
-    },1000);
+    },800);
 }
 
-// search
+// SEARCH FIX THUMBNAIL
 function search(){
-    socket.emit("searchSong", document.getElementById("search").value);
+    socket.emit("searchSong",document.getElementById("search").value);
 }
 
-socket.on("searchResults", list=>{
+socket.on("searchResults",list=>{
     const r=document.getElementById("results");
     r.innerHTML="";
+
     list.forEach(v=>{
-        const d=document.createElement("div");
-        d.innerText=v.title;
-        d.onclick=()=>socket.emit("changeVideo",v.id);
-        r.appendChild(d);
+        const div=document.createElement("div");
+        div.className="result";
+
+        div.innerHTML=`
+            <img src="${v.thumbnail}">
+            <div>${v.title}</div>
+        `;
+
+        div.onclick=()=>socket.emit("changeVideo",v.id);
+
+        r.appendChild(div);
     });
 });
 
-// chat FIX
+// CHAT FIX
 function send(){
     let t=document.getElementById("msg").value;
     if(!t) return;
@@ -93,7 +103,7 @@ function send(){
     document.getElementById("msg").value="";
 }
 
-socket.on("chatMessage", d=>{
+socket.on("chatMessage",d=>{
     const box=document.getElementById("chat");
 
     const div=document.createElement("div");
@@ -108,7 +118,7 @@ socket.on("chatMessage", d=>{
     box.scrollTop=box.scrollHeight;
 });
 
-// load yt api
+// load youtube api
 const tag=document.createElement("script");
 tag.src="https://www.youtube.com/iframe_api";
 document.body.appendChild(tag);
