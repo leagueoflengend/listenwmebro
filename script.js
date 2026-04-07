@@ -28,7 +28,6 @@ function onYouTubeIframeAPIReady() {
     });
 }
 
-// THEME & JOIN
 function toggleTheme() {
     document.body.classList.toggle('dark-theme');
     const isDark = document.body.classList.contains('dark-theme');
@@ -44,7 +43,6 @@ function joinRoom() {
     document.getElementById('joinModal').style.display = 'none';
 }
 
-// SOCKET LISTENERS
 socket.on('initRoom', (s) => {
     isSyncing = true;
     const check = setInterval(() => {
@@ -61,7 +59,7 @@ socket.on('updateUserList', (list) => {
     if(userListElem) userListElem.innerHTML = list.map(n => `<small style="background:var(--accent); color:#fff; padding:2px 6px; border-radius:10px; margin-right:4px;">${n}</small>`).join('');
 });
 
-socket.on('changeVideo', (id) => { isSyncing = true; player.loadVideoById(id); if(statusText) statusText.innerText = "Đang chuyển bài..."; setTimeout(() => isSyncing = false, 2000); });
+socket.on('changeVideo', (id) => { isSyncing = true; player.loadVideoById(id); setTimeout(() => isSyncing = false, 2000); });
 socket.on('play', (t) => { isSyncing = true; if(Math.abs(player.getCurrentTime()-t)>1.5) player.seekTo(t,true); player.playVideo(); setTimeout(()=>isSyncing=false,1000); });
 socket.on('pause', () => { isSyncing = true; player.pauseVideo(); setTimeout(()=>isSyncing=false,1000); });
 
@@ -76,60 +74,63 @@ socket.on('updatePlaylist', (list) => {
         <li style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid var(--border); font-size:0.85em;">
             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">${i+1}. ${item.title}</span>
             <div style="display:flex; gap:5px;">
-                <button onclick="socket.emit('moveVideoToTop',${i})" style="padding:2px 5px; font-size:0.7em;">⬆️</button>
-                <button onclick="socket.emit('removeVideo',${i})" style="padding:2px 5px; font-size:0.7em; background:#f7768e;">❌</button>
+                <button onclick="socket.emit('moveVideoToTop',${i})" style="padding:2px 5px; font-size:0.7em;">⬆️ Ưu tiên</button>
+                <button onclick="socket.emit('removeVideo',${i})" style="padding:2px 5px; font-size:0.7em; background:#f7768e;">❌ Xóa</button>
             </div>
         </li>`).join('') || '<li style="font-size:0.8em; color:var(--sub);">Trống...</li>';
 });
 
-// SEARCH
+// TÌM KIẾM
 function searchSong() {
     const q = youtubeLinkInput.value.trim(); if (!q || getValidId()) return;
     searchResultsBox.style.display = 'block';
     searchResultsBox.innerHTML = `<div style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; background:var(--inner);">
-        <small>KẾT QUẢ</small><span onclick="closeSearch()" style="cursor:pointer; color:#f7768e; font-weight:bold;">[Đóng X]</span>
+        <small>KẾT QUẢ TÌM KIẾM</small><span onclick="closeSearch()" style="cursor:pointer; color:#f7768e; font-weight:bold;">[Đóng X]</span>
     </div><div id="innerS" style="padding:10px; text-align:center;">Đang tìm...</div>`;
     socket.emit('searchSong', q);
 }
 
 socket.on('searchResults', (res) => {
     const inner = document.getElementById('innerS'); if (!inner) return;
+    if (res.length === 0) { inner.innerHTML = "Không tìm thấy bài nào."; return; }
+
     inner.innerHTML = res.map(v => `
-        <div class="search-item">
+        <div class="search-item" onclick="addToQueueFromSearch('${v.id}')">
             <img src="${v.thumbnail}">
             <div style="flex:1; text-align:left;">
                 <div style="font-weight:bold; font-size:0.85em; color:var(--accent);">${v.title}</div>
                 <div style="font-size:0.75em; color:var(--sub);">${v.duration} • ${v.author}</div>
-                <div style="margin-top:5px; display:flex; gap:5px;">
-                    <button onclick="socket.emit('changeVideo','${v.id}');closeSearch()" style="padding:3px 8px; font-size:0.7em;">▶ Phát</button>
-                    <button onclick="socket.emit('addToList','${v.id}');closeSearch()" style="padding:3px 8px; font-size:0.7em; background:#bb9af7;">+ Đợi</button>
-                </div>
+                <div style="font-size:0.7em; color:#9ece6a; margin-top:4px;">(Bấm để thêm vào hàng chờ)</div>
             </div>
-        </div>`).join('') || "Không thấy bài nào!";
+        </div>`).join('');
 });
 
-// HÀM PHỤ
-function closeSearch() { searchResultsBox.style.display = 'none'; youtubeLinkInput.value = ''; }
+function addToQueueFromSearch(id) {
+    socket.emit('addToList', id);
+    statusText.innerText = "Đã thêm vào hàng chờ!";
+    closeSearch();
+}
+
 function getValidId() {
     const url = youtubeLinkInput.value.trim();
     const regExp = /^.*(?:(?:youtu\.be\/|v\/|vi\/|u\/\w\/|embed\/|shorts\/)|(?:(?:watch)?\?v(?:i)?=|\&v(?:i)?=))([^#\&\?]*).*/;
     const match = url.match(regExp);
     return (match && match[1].length === 11) ? match[1] : null;
 }
-function playNow() { const id = getValidId(); if(id) { socket.emit('changeVideo', id); closeSearch(); } else alert("Link không hợp lệ!"); }
-function addToList() { const id = getValidId(); if(id) { socket.emit('addToList', id); closeSearch(); } else alert("Link không hợp lệ!"); }
+
+function playNow() {
+    const id = getValidId();
+    if (id) { socket.emit('changeVideo', id); closeSearch(); }
+    else alert("Link không hợp lệ!");
+}
+
+function closeSearch() { searchResultsBox.style.display = 'none'; youtubeLinkInput.value = ''; }
 function sendMessage() {
     const input = document.getElementById('chatInput');
     if (input.value.trim()) { socket.emit('chatMessage', { name: userName || "Khách", message: input.value }); input.value = ''; }
 }
 function skipVideo() { socket.emit('skipVideo'); }
-function toggleVideoMode() {
-    const c = document.getElementById('youtubePlayerContainer');
-    c.classList.toggle('audio-only-mode');
-    document.getElementById('toggleBtn').innerText = c.classList.contains('audio-only-mode') ? "📺 Chế độ: Nhạc" : "🎧 Chế độ: Video";
-}
 
-// INIT
 (function() { 
     if (localStorage.getItem('theme') === 'dark') { document.body.classList.add('dark-theme'); document.getElementById('theme-icon').className = 'fas fa-sun'; }
     window.addEventListener('click', (e) => { if(searchResultsBox && !searchResultsBox.contains(e.target) && e.target !== youtubeLinkInput) closeSearch(); });
