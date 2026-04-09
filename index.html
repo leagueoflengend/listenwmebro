@@ -2,61 +2,60 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>🎵</title>
+    <title>🎵 Listen With Me Pro</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="/socket.io/socket.io.js"></script>
     <style>
         :root {
-            --bg-body: #f4f6f9; --bg-container: rgba(255, 255, 255, 0.7);
-            --text-main: #1e293b; --text-sub: #64748b; --border-color: #e2e8f0;
-            --accent-color: #6366f1; --bg-msg-me: #6366f1; --bg-msg-other: #f1f5f9;
-            --glass-blur: blur(15px); --shadow: 0 10px 40px rgba(0,0,0,0.1);
+            --bg: #f4f6f9; --glass: rgba(255, 255, 255, 0.7); --text: #1e293b; --sub: #64748b;
+            --border: #e2e8f0; --accent: #6366f1; --msg-me: #6366f1; --msg-other: #f1f5f9;
+            --blur: blur(15px);
         }
         body.dark-theme {
-            --bg-body: #0f172a; --bg-container: rgba(30, 41, 59, 0.6);
-            --text-main: #f1f5f9; --text-sub: #94a3b8; --border-color: #334155;
-            --accent-color: #818cf8; --bg-msg-me: #818cf8; --bg-msg-other: #1e293b;
+            --bg: #0f172a; --glass: rgba(30, 41, 59, 0.6); --text: #f1f5f9; --sub: #94a3b8;
+            --border: #334155; --accent: #818cf8; --msg-me: #818cf8; --msg-other: #1e293b;
         }
         * { box-sizing: border-box; outline: none; }
         body {
-            margin: 0; padding: 20px; font-family: 'Inter', sans-serif;
-            background: var(--bg-body); color: var(--text-main);
+            margin: 0; padding: 20px; font-family: sans-serif; background: var(--bg); color: var(--text);
             transition: 0.3s; display: flex; flex-direction: column; align-items: center; min-height: 100vh;
         }
         .container {
-            width: 100%; max-width: 1100px; background: var(--bg-container);
-            backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
-            padding: 25px; border-radius: 20px; border: 1px solid var(--border-color);
-            display: grid; grid-template-columns: 1fr 320px; gap: 20px; box-shadow: var(--shadow); position: relative;
+            width: 100%; max-width: 1100px; background: var(--glass); backdrop-filter: var(--blur);
+            padding: 25px; border-radius: 20px; border: 1px solid var(--border);
+            display: grid; grid-template-columns: 1fr 320px; gap: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); position: relative;
         }
-        @media (max-width: 850px) { .container { grid-template-columns: 1fr; } }
-        .theme-switch { position: absolute; top: 20px; right: 20px; cursor: pointer; color: var(--accent-color); font-size: 1.4em; z-index: 10; }
-        .player-container { aspect-ratio: 16/9; width: 100%; background: #000; border-radius: 12px; overflow: hidden; border: 2px solid var(--border-color); }
-        #player { width: 100%; height: 100%; }
-        .online-info { font-size: 0.85em; margin-bottom: 10px; color: #10b981; }
-        .search-bar { display: flex; gap: 10px; margin: 15px 0; }
-        input { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.1); color: inherit; }
-        button { padding: 10px 20px; border: none; border-radius: 10px; background: var(--accent-color); color: #fff; cursor: pointer; font-weight: bold; }
-        .results-box { position: absolute; width: 100%; background: var(--bg-container); backdrop-filter: blur(20px); border-radius: 10px; z-index: 100; display: none; max-height: 300px; overflow-y: auto; top: 100%; border: 1px solid var(--border-color); }
+        @media (max-width: 900px) { .container { grid-template-columns: 1fr; } }
+        .theme-switch { position: absolute; top: 20px; right: 20px; cursor: pointer; color: var(--accent); font-size: 1.4em; z-index: 10; }
+        .player-container { aspect-ratio: 16/9; background: #000; border-radius: 12px; overflow: hidden; border: 2px solid var(--border); }
+        .online-info { font-size: 0.85em; margin-bottom: 10px; color: #10b981; font-weight: bold; }
+        .search-area { position: relative; margin-top: 15px; }
+        .search-bar { display: flex; gap: 10px; }
+        input { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid var(--border); background: rgba(0,0,0,0.1); color: inherit; }
+        button { padding: 10px 20px; border: none; border-radius: 10px; background: var(--accent); color: #fff; cursor: pointer; font-weight: bold; }
+        .results-box { position: absolute; width: 100%; background: var(--glass); backdrop-filter: blur(20px); border-radius: 10px; z-index: 100; display: none; max-height: 300px; overflow-y: auto; top: 100%; border: 1px solid var(--border); }
         .results-box.active { display: block; }
-        .result-item { display: flex; gap: 10px; padding: 10px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
-        .queue-box, .chat-area { background: rgba(0,0,0,0.1); border-radius: 12px; border: 1px solid var(--border-color); }
+        .result-item { display: flex; gap: 10px; padding: 10px; border-bottom: 1px solid var(--border); cursor: pointer; }
+        .queue-box, .chat-area { background: rgba(0,0,0,0.1); border-radius: 12px; border: 1px solid var(--border); }
         .queue-box { height: 200px; overflow-y: auto; padding: 10px; margin-bottom: 15px; }
         .chat-area { height: 380px; display: flex; flex-direction: column; overflow: hidden; }
-        #chatMsgs { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-        .msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 0.9em; }
-        .msg-time { font-size: 0.7em; opacity: 0.5; margin-left: 8px; }
-        .msg.me { align-self: flex-end; background: var(--bg-msg-me); color: white; }
-        .msg.other { align-self: flex-start; background: var(--bg-msg-other); }
-        #join { position: fixed; inset: 0; background: var(--bg-body); z-index: 1000; display: flex; justify-content: center; align-items: center; }
+        #chatMsgs { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 0.9em; position: relative; }
+        .msg-time { font-size: 0.7em; opacity: 0.5; display: block; margin-top: 4px; }
+        .msg.me { align-self: flex-end; background: var(--msg-me); color: white; border-bottom-right-radius: 4px; }
+        .msg.other { align-self: flex-start; background: var(--msg-other); border-bottom-left-radius: 4px; }
+        #join { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: flex; justify-content: center; align-items: center; }
+        .join-box { background: var(--glass); padding: 40px; border-radius: 20px; text-align: center; width: 320px; border: 1px solid var(--border); }
+        .q-btn { cursor: pointer; padding: 5px; transition: 0.2s; }
+        .q-btn:hover { transform: scale(1.2); }
     </style>
 </head>
 <body>
     <div id="join">
-        <div style="text-align:center; background:var(--bg-container); padding:40px; border-radius:20px; border: 1px solid var(--border-color); backdrop-filter: blur(10px);">
-            <h2>🎵</h2>
-            <input id="uNameInp" placeholder="Tên" onkeypress="if(event.key==='Enter') handleJoin()">
-            <button id="btnJoin" onclick="handleJoin()" style="width:100%; margin-top:10px;">Dô!!</button>
+        <div class="join-box">
+            <h2 style="margin-top:0">🎵 Listen With Me</h2>
+            <input id="uNameInput" placeholder="Tên của bạn..." onkeypress="if(event.key==='Enter') handleJoinClick()">
+            <button id="btnJoin" onclick="handleJoinClick()" style="width:100%; margin-top:10px;">Vào phòng</button>
         </div>
     </div>
     <div class="container">
@@ -64,24 +63,24 @@
         <div class="main">
             <div class="online-info">🟢 Online (<span id="uCount">0</span>): <span id="uList">...</span></div>
             <div class="player-container"><div id="player"></div></div>
-            <div class="search-area" style="position:relative">
+            <div class="search-area">
                 <div class="search-bar">
-                    <input id="sInp" placeholder="Tìm bài hoặc dán link..." onkeypress="if(event.key==='Enter') handleSearch()">
-                    <button id="btnSearch" onclick="handleSearch()">Tìm bài</button>
-                    <button id="btnLink" onclick="handlePlayLink()" style="background:#10b981">Thêm Link</button>
+                    <input id="sQueryInput" placeholder="Tìm tên bài hoặc dán link..." onkeypress="if(event.key==='Enter') handleSearchClick()">
+                    <button id="btnSearch" onclick="handleSearchClick()">Tìm bài</button>
+                    <button id="btnLink" onclick="handleLinkClick()" style="background:#10b981">Thêm Link</button>
                 </div>
                 <div id="results" class="results-box"></div>
             </div>
-            <button id="btnSkip" onclick="handleSkip()" style="width:100%; background:#ef4444; margin-top:5px">⏭ Skip bài</button>
+            <button onclick="handleSkipClick()" style="width:100%; background:#ef4444; margin-top:10px">⏭ Skip bài</button>
         </div>
         <div class="sidebar">
-            <h3 style="margin: 0 0 10px 0; font-size: 1em; color: var(--accent-color);">📜 HÀNG ĐỢI</h3>
+            <h3 style="margin: 0 0 10px 0; font-size: 1em; color: var(--accent);">📜 HÀNG ĐỢI</h3>
             <div id="qBox" class="queue-box"></div>
             <div class="chat-area">
                 <div id="chatMsgs"></div>
-                <div style="display:flex; gap:5px; padding:10px; border-top:1px solid var(--border-color)">
-                    <input id="mInp" placeholder="Chat..." onkeypress="if(event.key==='Enter') handleSend()">
-                    <button id="btnSend" onclick="handleSend()">Gửi</button>
+                <div style="display:flex; gap:5px; padding:10px; border-top:1px solid var(--border)">
+                    <input id="mChatInput" placeholder="Chat..." onkeypress="if(event.key==='Enter') handleChatClick()">
+                    <button id="btnChat" onclick="handleChatClick()">Gửi</button>
                 </div>
             </div>
         </div>
