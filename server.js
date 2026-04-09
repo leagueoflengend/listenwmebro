@@ -22,8 +22,7 @@ function playNext() {
         io.emit("changeVideo", next.id);
         io.emit("updateQueue", playlist);
     } else {
-        roomState.videoId = null;
-        roomState.isPlaying = false;
+        roomState.videoId = null; roomState.isPlaying = false;
         io.emit("updateQueue", []);
     }
 }
@@ -45,19 +44,22 @@ io.on('connection', socket => {
             const res = await youtube.search.list({ part: 'snippet', q, maxResults: 5, type: 'video' });
             const results = res.data.items.map(v => ({ id: v.id.videoId, title: v.snippet.title, thumbnail: v.snippet.thumbnails.medium.url }));
             socket.emit("searchResults", results);
-        } catch (e) { socket.emit("searchResults", []); }
+        } catch (e) { 
+            console.error("YouTube API Error:", e.message);
+            socket.emit("searchResults", { error: "QuotaExceeded" }); 
+        }
     });
 
     socket.on("addLinkToQueue", async (id) => {
         try {
-            const res = await youtube.videos.list({ part: 'snippet', id: id });
+            const res = await youtube.videos.list({ part: 'snippet', id });
             if (res.data.items[0]) {
                 const v = res.data.items[0];
                 playlist.push({ id, title: v.snippet.title, thumbnail: v.snippet.thumbnails.medium.url });
                 io.emit("updateQueue", playlist);
                 if (!roomState.videoId) playNext();
             }
-        } catch (e) { console.log(e); }
+        } catch (e) { socket.emit("searchResults", { error: "QuotaExceeded" }); }
     });
 
     socket.on("addToQueue", item => {
@@ -85,6 +87,7 @@ io.on('connection', socket => {
     socket.on("skip", () => playNext());
     socket.on("ended", () => playNext());
     socket.on("chatMessage", d => io.emit("chatMessage", d));
+    
     socket.on("disconnect", () => {
         delete users[socket.id];
         io.emit("updateUserList", Object.values(users));
